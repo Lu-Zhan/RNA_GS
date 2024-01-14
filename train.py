@@ -332,7 +332,7 @@ def main(
     num_points: int = 8000,
     save_imgs: bool = True,
     # img_path: Optional[Path] = None, # 'data/POOL_uint8regi_cropped_0/F1R1Ch2.png',
-    img_path: Optional[Path] = Path('data/1213_demo_data_v2/raw1'),
+    img_path: Optional[Path] = Path('../data/1213_demo_data_v2/raw1'),
     iterations: int = 20000,
     lr: float = 0.002,
     exp_name: str = 'debug',
@@ -347,7 +347,6 @@ def main(
         'w_bg': weights[4],
         'w_ssim': weights[5],
         'w_code_cos': weights[6],
-        'run_name': exp_name,
         'exp_name': exp_name,
         'codebook_path': 'data/codebook.xlsx',
     }
@@ -355,7 +354,7 @@ def main(
     wandb.init(
         project="rna_cali",
         config=config,
-        name=config["run_name"],
+        name=config["exp_name"],
     )
 
     print(f"Running with config: {config}")

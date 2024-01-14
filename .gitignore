@@ -1,3 +1,4 @@
 exps/
 outputs/
 wandb/
+*.pyc
