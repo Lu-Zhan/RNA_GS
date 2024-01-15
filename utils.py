@@ -32,8 +32,8 @@ def get_index_cos(pred_code, codebook):
 
     return max_value, index
 
-
-def write_to_csv(pixel_coords, alpha, save_path, h, w, image, codebook_path='../data/codebook.xlsx'):
+#(gzx):读入的codebook_path
+def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'data/codebook.xlsx'):
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
     rna_name = read_codebook_name(path=codebook_path)
