@@ -187,7 +187,7 @@ class SimpleTrainer:
             ],
             -1,
         )
-        self.opacities = torch.oens((self.num_points, 1), device=self.device)
+        self.opacities = torch.ones((self.num_points, 1), device=self.device)
 
         self.viewmat = torch.tensor(
             [
