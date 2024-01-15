@@ -1,0 +1,4 @@
+D:/00 LClabCode/00 ImageProcess/IM41255 20231208/POOL/ 
+ F=6
+x0=1100,y0=1600
+width=400
