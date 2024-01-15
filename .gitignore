@@ -2,3 +2,5 @@ exps/
 outputs/
 wandb/
 *.pyc
+data/
+__pycache__
