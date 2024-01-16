@@ -1,0 +1,2 @@
+export WANDB_API_KEY=b3a9139b4f82902def9e2675e768ce664219c4ab
+export WANDB_MODE=offline

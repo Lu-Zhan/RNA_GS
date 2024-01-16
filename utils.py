@@ -3,64 +3,7 @@ import torch
 
 import numpy as np
 import pandas as pd
-import cv2
-from pathlib import Path
 from skimage import filters
-
-
-# (zwx)
-def preprocess_data(dir_path: Path):
-    image_paths = [dir_path / f"{i}.png" for i in range(1, 16)]
-    ths = 13  # 更改二值化阈值
-    pp = []
-    for full_path in image_paths:
-        img = cv2.imread(str(full_path))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        kernel = np.ones((2, 2), dtype=np.uint8)
-        img_normalized = cv2.convertScaleAbs(img)
-        usm = cv2.erode(img_normalized, kernel, iterations=1)
-        # (gzx):用腐蚀之后的图像
-        thresh = cv2.threshold(usm, ths, 255, cv2.THRESH_BINARY)[1]
-
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
-            thresh.copy(), connectivity=8, ltype=cv2.CV_32S
-        )
-        # 加入连通块外接矩阵几何中心
-        for i in range(1, num_labels):  # 从1开始，跳过背景区域
-            x, y, width, height, area = stats[i]
-            centre_x = np.int64(x + width // 2)
-            centre_y = np.int64(y + height // 2)
-            pp.append([centre_x, centre_y])
-        for pi in centroids[1:]:
-            px, py = np.int64(pi[0]), np.int64(pi[1])
-            pp.append([px, py])
-    pp = np.array(pp)
-    # 去重
-    unique_pp = np.unique(pp, axis=0)
-    return len(unique_pp), unique_pp
-
-
-def give_required_data(input_coords, image_size, image_array, device):
-    # normalising pixel coordinates [-1,1]
-    coords = torch.tensor(
-        input_coords / [image_size[0], image_size[1]], device=device
-    ).float()  # , dtype=torch.float32
-    center_coords_normalized = torch.tensor(
-        [0.5, 0.5], device=device
-    ).float()  # , dtype=torch.float32
-    coords = (center_coords_normalized - coords) * 2.0
-    # Fetching the colour of the pixels in each coordinates
-    colour_values = [image_array[coord[1], coord[0]] for coord in input_coords]
-    colour_values_on_cpu = [
-        tensor.cpu() if isinstance(tensor, torch.Tensor) else tensor
-        for tensor in colour_values
-    ]
-    colour_values_np = np.array(colour_values_on_cpu)
-    colour_values_tensor = torch.tensor(
-        colour_values_np, device=device
-    ).float()  # , dtype=torch.float32
-
-    return colour_values_tensor, coords
 
 
 def read_codebook(path):
@@ -95,6 +38,7 @@ def get_index_cos(pred_code, codebook):
     max_value = (max_value + 1) / 2
 
     return max_value, index
+
 
 #(gzx):读入的codebook_path
 def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'data/codebook.xlsx'):
