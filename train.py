@@ -26,62 +26,17 @@ from losses import (
     bg_loss,
     ssim_loss,
     codebook_cos_loss,
+    li_codeloss,
+    otsu_codeloss,
+    codebook_hamming_loss,
 )
-from utils import write_to_csv, read_codebook
-
-
-# (zwx)
-def preprocess_data(dir_path: Path):
-    image_paths = [dir_path / f"{i}.png" for i in range(1, 16)]
-    ths = 13  # 更改二值化阈值
-    pp = []
-    for full_path in image_paths:
-        img = cv2.imread(str(full_path))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        kernel = np.ones((2, 2), dtype=np.uint8)
-        img_normalized = cv2.convertScaleAbs(img)
-        usm = cv2.erode(img_normalized, kernel, iterations=1)
-        thresh = cv2.threshold(img_normalized, ths, 255, cv2.THRESH_BINARY)[1]
-
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
-            thresh.copy(), connectivity=8, ltype=cv2.CV_32S
-        )
-        # 加入连通块外接矩阵几何中心
-        for i in range(1, num_labels):  # 从1开始，跳过背景区域
-            x, y, width, height, area = stats[i]
-            centre_x = np.int64(x + width // 2)
-            centre_y = np.int64(y + height // 2)
-            pp.append([centre_x, centre_y])
-        for pi in centroids[1:]:
-            px, py = np.int64(pi[0]), np.int64(pi[1])
-            pp.append([px, py])
-    pp = np.array(pp)
-    # 去重
-    unique_pp = np.unique(pp, axis=0)
-    return len(unique_pp), unique_pp
-
-
-def give_required_data(input_coords, image_size, image_array, device):
-    # normalising pixel coordinates [-1,1]
-    coords = torch.tensor(
-        input_coords / [image_size[0], image_size[1]], device=device
-    ).float()  # , dtype=torch.float32
-    center_coords_normalized = torch.tensor(
-        [0.5, 0.5], device=device
-    ).float()  # , dtype=torch.float32
-    coords = (center_coords_normalized - coords) * 2.0
-    # Fetching the colour of the pixels in each coordinates
-    colour_values = [image_array[coord[1], coord[0]] for coord in input_coords]
-    colour_values_on_cpu = [
-        tensor.cpu() if isinstance(tensor, torch.Tensor) else tensor
-        for tensor in colour_values
-    ]
-    colour_values_np = np.array(colour_values_on_cpu)
-    colour_values_tensor = torch.tensor(
-        colour_values_np, device=device
-    ).float()  # , dtype=torch.float32
-
-    return colour_values_tensor, coords
+from utils import (
+    write_to_csv,
+    write_to_csv_hamming,
+    read_codebook,
+    preprocess_data,
+    give_required_data,
+)
 
 
 class SimpleTrainer:
@@ -237,7 +192,6 @@ class SimpleTrainer:
                 self.tile_bounds,
             )
             torch.cuda.synchronize()
-
             times[0] += time.time() - start
             start = time.time()
             out_img = rasterize_gaussians(
@@ -263,8 +217,60 @@ class SimpleTrainer:
             loss_bg = bg_loss(out_img, self.gt_image)
             loss_ssim = ssim_loss(out_img, self.gt_image)
 
-            # loss for calibration
-            loss_cos_dist = codebook_cos_loss(self.rgbs, self.codebook)
+            # (zwx) loss for calibration
+            flag = True
+            scale_x = torch.sigmoid(self.scales[:, 0])
+            scale_y = torch.sigmoid(self.scales[:, 1])
+            alpha = torch.sigmoid(self.rgbs)
+            diff_x = scale_x - torch.clamp(scale_x, 0.12, 0.24)
+            diff_y = scale_y - torch.clamp(scale_x, 0.12, 0.24)
+            # sigma -> axis length, need modification
+            scale_loss_x = torch.where(
+                torch.abs(diff_x) < 0.5,
+                0.5 * diff_x**2,
+                0.5 * (torch.abs(diff_x) - 0.5 * 0.5),
+            )
+            scale_loss_y = torch.where(
+                torch.abs(diff_y) < 0.5,
+                0.5 * diff_y**2,
+                0.5 * (torch.abs(diff_y) - 0.5 * 0.5),
+            )
+            scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
+            if self.cfg["loss"] == "cos":
+                loss_cos_dist, _ = codebook_cos_loss(alpha, self.codebook)
+            else:
+                if flag:
+                    loss_cos_dist, _ = codebook_hamming_loss(
+                        alpha, self.codebook, "normal"
+                    )
+                else:
+                    if self.cfg["loss"] == "mean":
+                        loss_cos_dist, _ = codebook_hamming_loss(
+                            alpha, self.codebook, "mean"
+                        )
+                    elif self.cfg["loss"] == "median":
+                        loss_cos_dist, _ = codebook_hamming_loss(
+                            alpha, self.codebook, "median"
+                        )
+                    elif self.cfg["loss"] == "li":
+                        loss_cos_dist, _ = li_codeloss(alpha, self.codebook)
+                if iter == 0:
+                    formal_code_loss = abs(loss_cos_dist.item())
+                elif (
+                    iter % 200 == 0
+                    and abs(formal_code_loss - loss_cos_dist) < 0.01
+                    and flag == True
+                ):
+                    # print(f'start using {self.cfg["loss"]} as threshold')
+                    formal_code_loss = loss_cos_dist.item()
+                    flag = False
+                elif iter % 200 == 0:
+                    formal_code_loss = loss_cos_dist.item()
+                tolerance = 2 / 15.0
+                if loss_cos_dist < tolerance:
+                    loss_cos_dist = 0
+                else:
+                    loss_cos_dist -= tolerance
 
             loss = 0
 
@@ -280,6 +286,8 @@ class SimpleTrainer:
                 loss += self.cfg["w_bg"] * loss_bg
             if self.cfg["w_ssim"] > 0:
                 loss += self.cfg["w_ssim"] * loss_ssim
+            if self.cfg["w_scale"] > 0:
+                loss += self.cfg["w_scale"] * scale_loss
             if self.cfg["w_code_cos"] > 0:
                 loss += self.cfg["w_code_cos"] * loss_cos_dist
 
@@ -362,15 +370,30 @@ class SimpleTrainer:
             f"Per step(s):\nProject: {times[0]/iterations:.5f}, Rasterize: {times[1]/iterations:.5f}, Backward: {times[2]/iterations:.5f}"
         )
 
-        # save csv
-        write_to_csv(
-            image=self.gt_image[..., 0],
-            pixel_coords=xys,
-            alpha=self.rgbs,
-            save_path=f"{out_dir}/output.csv",
-            h=self.H,
-            w=self.W,
-        )
+        # (zwx) save csv
+        if self.cfg["loss"] == "cos":
+            write_to_csv(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=self.rgbs,
+                save_path=f"{out_dir}/output.csv",
+                h=self.H,
+                w=self.W,
+            )
+        elif (
+            self.cfg["loss"] == "mean"
+            or self.cfg["loss"] == "median"
+            or self.cfg["loss"] == "li"
+        ):
+            write_to_csv_hamming(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=self.rgbs,
+                save_path=f"{out_dir}/output.csv",
+                h=self.H,
+                w=self.W,
+                loss=self.cfg["loss"],
+            )
 
 
 def image_path_to_tensor(image_path: Path):
@@ -460,6 +483,7 @@ def main(
     iterations: int = 20000,
     lr: float = 0.002,
     exp_name: str = "debug",
+    loss: str = "mean",
     weights: list[float] = [
         0,
         1,
@@ -467,8 +491,9 @@ def main(
         0,
         0,
         0,
+        0.00001,
         0.001,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
+    ],  # l1, l2, lml1, lml2, bg, ssim, scale, code_cos
 ) -> None:
     config = {
         "w_l1": weights[0],
@@ -477,9 +502,11 @@ def main(
         "w_lml2": weights[3],
         "w_bg": weights[4],
         "w_ssim": weights[5],
-        "w_code_cos": weights[6],
+        "w_scale": weights[6],
+        "w_code_cos": weights[7],
         "exp_name": exp_name,
         "codebook_path": "data/codebook.xlsx",
+        "loss": loss,
     }
 
     wandb.init(
