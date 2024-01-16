@@ -413,6 +413,7 @@ class SimpleTrainer:
                             "loss/bg": loss_bg,
                             "loss/ssim": loss_ssim,
                             "loss/code_cos": loss_cos_dist,
+                            "loss/scale_loss": scale_loss,
                             "psnr/mean": mean_psnr,
                         },
                         step=iter,
