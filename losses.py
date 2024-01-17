@@ -211,3 +211,22 @@ def size_loss(sigma_x, sigma_y, min_size=6, max_size=12):
     loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(max_size - 12).mean()
 
     return loss_x + loss_y
+
+def scale_loss(scale_x, scale_y):
+    # sigma -> axis length, need modification
+    scale_x = torch.sigmoid(scale_x)
+    scale_y = torch.sigmoid(scale_y)
+    diff_x = scale_x - torch.clamp(scale_x, 0.12, 0.24)
+    diff_y = scale_y - torch.clamp(scale_x, 0.12, 0.24)
+    scale_loss_x = torch.where(
+        torch.abs(diff_x) < 0.5,
+        0.5 * diff_x**2,
+        0.5 * (torch.abs(diff_x) - 0.5 * 0.5),
+    )
+    scale_loss_y = torch.where(
+        torch.abs(diff_y) < 0.5,
+        0.5 * diff_y**2,
+        0.5 * (torch.abs(diff_y) - 0.5 * 0.5),
+    )
+    scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
+    return scale_loss

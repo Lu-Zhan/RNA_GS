@@ -474,12 +474,12 @@ class SimpleTrainer:
             self.cfg["cali_loss_type"] == "mean"
             or self.cfg["cali_loss_type"] == "median"
             or self.cfg["cali_loss_type"] == "li"
-            or self.cfg["cali_loss_type"] == "ostu"
+            or self.cfg["cali_loss_type"] == "otsu"
         ):
             write_to_csv_hamming(
                 image=self.gt_image[..., 0],
                 pixel_coords=xys,
-                alpha=self.rgbs,
+                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
                 save_path=f"{out_dir}/output.csv",
                 h=self.H,
                 w=self.W,
