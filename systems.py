@@ -48,18 +48,16 @@ class SimpleTrainer:
     def __init__(
         self,
         gt_image: Tensor,
-        num_points: int = 8000,
         primary_samples: int = 20000,
         backup_samples: int = 8000,
         image_file_name: Path = "",
         image_size: list = [401, 401, 3],
-        # kernal_size: int = 25,
-        densification_interval:int = 1000,
+        densification_interval: int = 1000,
         cfg: Optional[dict] = None,
     ):
         self.device = torch.device("cuda:0")
         self.gt_image = gt_image.to(device=self.device)
-        self.num_points = num_points
+        # self.num_points = num_points
         self.primary_samples = primary_samples
         self.backup_samples = backup_samples
         self.image_size = image_size
@@ -340,7 +338,18 @@ class SimpleTrainer:
             times[2] += time.time() - start
             optimizer.step()
 
-            self.validation(save_imgs, loss, out_img, persist_rgbs, conics, alpha, iter, iterations, frames, out_dir)
+            self.validation(
+                save_imgs=save_imgs, 
+                loss=loss, 
+                out_img=out_img, 
+                persist_rgbs=persist_rgbs, 
+                conics=conics, 
+                alpha=torch.sigmoid(persist_rgbs), 
+                iter=iter, 
+                iterations=iterations, 
+                frames=frames, 
+                out_dir=out_dir,
+            )
         
         # (zwx) print code loss
         print("test_li:", li_codeloss(torch.sigmoid(persist_rgbs), self.codebook)[0].item(),
@@ -417,10 +426,10 @@ class SimpleTrainer:
             loss_bg = bg_loss(out_img, self.gt_image)
             loss_ssim = ssim_loss(out_img, self.gt_image)
 
-            loss_cos_dist, _ = codebook_cos_loss("cos", alpha, self.codebook, flag=True, iter=iter)
-            loss_nml_hm_dist, _ = codebook_hamming_loss("normal", alpha, self.codebook, flag=True, iter=iter)
-            loss_mean_hm_dist, _ = codebook_hamming_loss("mean", alpha, self.codebook, flag=False, iter=iter)
-            loss_median_hm_dist, _ = codebook_hamming_loss("median", alpha, self.codebook, flag=False, iter=iter)
+            loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
+            loss_nml_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "normal")
+            loss_mean_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "mean")
+            loss_median_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "median")
             loss_li_hm_dist, _ = li_codeloss(alpha, self.codebook)
             loss_otsu_hm_dist, _ = otsu_codeloss(alpha, self.codebook)
 

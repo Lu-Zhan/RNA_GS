@@ -11,7 +11,8 @@ from preprocess import images_to_tensor
 def main(
     height: int = 256,
     width: int = 256,
-    num_points: int = 8000,
+    primary_samples: int = 8000,
+    backup_samples: int = 8000,
     save_imgs: bool = True,
     img_path: Optional[Path] = Path("data/1213_demo_data_v2/raw1"),
     codebook_path: Optional[Path] = Path("data/codebook.xlsx"),
@@ -30,7 +31,6 @@ def main(
         0.001,
         0.1,
         0,
-        0
     ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size
     thresholds: list[float] = [
         0.3,
@@ -54,6 +54,9 @@ def main(
         "exp_name": exp_name,
         "codebook_path": codebook_path,
         "cali_loss_type": cali_loss_type,
+        "primary_samples": primary_samples,
+        "backup_samples": backup_samples,
+        "densification_interval": densification_interval,
     }
 
     wandb.init(
