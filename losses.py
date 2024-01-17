@@ -184,7 +184,7 @@ def codebook_hamming_loss(pred_code, codebook, mode):
 def obtain_sigma_xy(conics):
     # conics is a tensor of shape (N, 3), inverse covariance matrix in upper triangular format, whose unit is pixel
     # recover to covariance matrix
-    inv_cov = torch.cat([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
+    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
     inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
 
     cov = torch.inverse(inv_cov)    # (N, 2, 2)
