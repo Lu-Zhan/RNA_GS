@@ -21,6 +21,7 @@ def main(
     lr: float = 0.002,
     exp_name: str = "debug",
     cali_loss_type: str = "cos",
+    intialization: bool = False,
     weights: list[float] = [
         0,
         1,
@@ -65,6 +66,7 @@ def main(
         "primary_samples": primary_samples,
         "backup_samples": backup_samples,
         "densification_interval": densification_interval,
+        "intialization":intialization,
     }
 
     wandb.init(

@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from skimage import filters
+import matplotlib.pyplot as plt
 
 
 def read_codebook(path):
@@ -41,17 +42,12 @@ def get_index_cos(pred_code, codebook):
 
 
 #(gzx):读入的codebook_path
-def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'data/codebook.xlsx'):
+def write_to_csv(pixel_coords, alpha, save_path, h, w, image,ref,codebook_path = 'data/codebook.xlsx'):
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
     rna_name = read_codebook_name(path=codebook_path)
 
     pred_code = alpha
-
-    scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
-    indexs = indexs.data.cpu().numpy()
-    scores = scores.data.cpu().numpy()
-    pred_name = rna_name[indexs]  # (num_samples,)
 
     px = pixel_coords.data.cpu().numpy()[:, 0]
     py = pixel_coords.data.cpu().numpy()[:, 1]
@@ -61,6 +57,18 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'da
     px = np.clip(px, 0, w - 1)
     py = np.clip(py, 0, h - 1)
 
+    print(px)
+    print(py)
+    print(ref.max(dim=2))
+    ref_scores = torch.clamp(ref.max(dim=2)[px,py] - 25.0, 0. ,10.)/10.0
+
+    scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
+    indexs = indexs.data.cpu().numpy()
+    
+    total_scores = ref_scores * scores
+    scores = total_scores.data.cpu().numpy()
+    
+    pred_name = rna_name[indexs]  # (num_samples,)
     
     df = pd.DataFrame(
         {"x": px, "y": py, "gene": pred_name, "index": indexs, "score": scores}
@@ -68,6 +76,10 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'da
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     df.to_csv(save_path, index=False)
+    
+    plt.hist(scores)
+    plt.savefig(save_path.replace(".csv", "_scorehist.png"))
+    plt.close()
 
     print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.7))
     print("number of vaild point (th=0.9)", count_vaild_pixel(score=scores, th=0.85))
@@ -206,6 +218,7 @@ def draw_results(image, px, py, pred_name, scores, save_path):
     #     ax.annotate(txt, (px[i], py[i]))
 
     plt.savefig(save_path)
+    plt.close()
 
 
 def count_vaild_pixel(score, th=0.9):

@@ -396,6 +396,7 @@ class SimpleTrainer:
                 save_path=f"{out_dir}/output.csv",
                 h=self.H,
                 w=self.W,
+                ref=self.gt_image,
                 codebook_path = self.cfg["codebook_path"],
         )
         elif (
