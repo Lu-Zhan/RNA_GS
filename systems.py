@@ -28,15 +28,6 @@ from losses import (
     obtain_sigma_xy,
     size_loss,
     circle_loss,
-    obtain_sigma_xy,
-    size_loss,
-    circle_loss,
-    obtain_sigma_xy,
-    size_loss,
-    circle_loss,
-    obtain_sigma_xy,
-    size_loss,
-    circle_loss,
 )
 
 from utils import (
