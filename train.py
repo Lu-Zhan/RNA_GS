@@ -21,6 +21,8 @@ def main(
     lr: float = 0.002,
     exp_name: str = "debug",
     cali_loss_type: str = "cos",
+    initialization: bool = False,
+    pos_score: bool = False,
     weights: list[float] = [
         0,
         1,
@@ -33,7 +35,7 @@ def main(
         0,
     ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size
     thresholds: list[float] = [
-        0.3,
+        0.1,
         0.04,
         0.04,
     ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
@@ -41,7 +43,7 @@ def main(
         False,
         False,
         False
-    ]  # l1, l2, lml1, lml2, bg, ssim, code_cos
+    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
 ) -> None:
     config = {
         "w_l1": weights[0],
@@ -65,6 +67,8 @@ def main(
         "primary_samples": primary_samples,
         "backup_samples": backup_samples,
         "densification_interval": densification_interval,
+        "initialization":initialization,
+        "pos_score":pos_score
     }
 
     wandb.init(
@@ -78,6 +82,7 @@ def main(
     if img_path:
         # gt_image = image_path_to_tensor(img_path)
         gt_image = images_to_tensor(img_path)
+        # print(gt_image)
 
     else:
         gt_image = torch.ones((height, width, 3)) * 1.0

@@ -234,9 +234,10 @@ def scale_loss(scale_x, scale_y):
     return scale_loss
 
 
-def codebook_loss(type, alpha, codebook, flag, iter):
+def codebook_loss(type, alpha, codebook, flag, iter,formal_code_loss = 0):
     if type == "cos":
         loss_cos_dist = codebook_cos_loss(alpha, codebook)
+        formal_code_loss = 0
     else:
         if flag:
             loss_cos_dist, _ = codebook_hamming_loss(
@@ -275,4 +276,4 @@ def codebook_loss(type, alpha, codebook, flag, iter):
         else:
             loss_cos_dist -= tolerance
     
-    return loss_cos_dist, flag
+    return loss_cos_dist, flag, formal_code_loss

@@ -65,6 +65,8 @@ class SimpleTrainer:
         self.prune_flag = cfg["prune_flag"]
         self.split_flag = cfg["split_flag"]
         self.clone_flag = cfg["clone_flag"]
+        self.initialization = cfg['initialization']
+        self.pos_score = cfg["pos_score"]
         self.densification_interval = densification_interval
         # self.kernal_size = kernal_size
 
@@ -93,30 +95,34 @@ class SimpleTrainer:
     def _init_gaussians(self, image_file_name):
         self.num_points = self.primary_samples + self.backup_samples
         coords = np.random.randint(0, [self.W, self.H], size=(self.num_points, 2))
-        num_samples1, coords1 = preprocess_data(Path(image_file_name))
+        
+        if self.initialization:
+        
+            num_samples1, coords1 = preprocess_data(Path(image_file_name))
 
-        if num_samples1 >= self.primary_samples:
-            print("too many initial points")
-            exit(0)
+            if num_samples1 >= self.primary_samples:
+                print("too many initial points")
+                exit(0)
 
-        if num_samples1 >= self.primary_samples / 2:
-            coords_noise = np.random.randint(
-                -1, [2, 2], size=(self.primary_samples - num_samples1, 2)
-            )
-            coords[0:num_samples1, :] = coords1
-            coords[num_samples1 : self.primary_samples, :] = np.clip(
-                coords1[0 : self.primary_samples - num_samples1, :] + coords_noise,
-                0,
-                [self.W - 1, self.H - 1],
-            )
-        else:
-            coords_noise = np.random.randint(-1, [2, 2], size=(num_samples1, 2))
-            coords[0:num_samples1, :] = coords1
-            coords[num_samples1 : num_samples1 * 2, :] = np.clip(
-                coords1 + coords_noise, 0, [self.W - 1, self.H - 1]
-            )
-            self.primary_samples = num_samples1 * 2
-            self.backup_samples = self.num_points - self.primary_samples
+            if num_samples1 >= self.primary_samples / 2:
+                coords_noise = np.random.randint(
+                    -1, [2, 2], size=(self.primary_samples - num_samples1, 2)
+                )
+                coords[0:num_samples1, :] = coords1
+                coords[num_samples1 : self.primary_samples, :] = np.clip(
+                    coords1[0 : self.primary_samples - num_samples1, :] + coords_noise,
+                    0,
+                    [self.W - 1, self.H - 1],
+                )
+            else:
+                coords_noise = np.random.randint(-1, [2, 2], size=(num_samples1, 2))
+                coords[0:num_samples1, :] = coords1
+                coords[num_samples1 : num_samples1 * 2, :] = np.clip(
+                    coords1 + coords_noise, 0, [self.W - 1, self.H - 1]
+                )
+                self.primary_samples = num_samples1 * 2
+                self.backup_samples = self.num_points - self.primary_samples
+                
         colour_values, pixel_coords = give_required_data(
             coords, self.image_size, self.gt_image, self.device
         )
@@ -182,6 +188,7 @@ class SimpleTrainer:
         # start0 = time.time() #(gzx):计算时间
         frames = []
         times = [0] * 3  # project, rasterize, backward
+        formal_code_loss = 0
         for iter in range(iterations):
             
             #(gzx)
@@ -275,7 +282,7 @@ class SimpleTrainer:
                 loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
                 loss += self.cfg["w_size"] * loss_size
             if self.cfg["w_code_cos"] > 0:
-                loss_cos_dist, flag = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter)
+                loss_cos_dist, flag, formal_code_loss = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter,formal_code_loss)
                 loss += self.cfg["w_code_cos"] * loss_cos_dist
 
             optimizer.zero_grad()
@@ -393,6 +400,8 @@ class SimpleTrainer:
                 save_path=f"{out_dir}/output.csv",
                 h=self.H,
                 w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
                 codebook_path = self.cfg["codebook_path"],
         )
         elif (
@@ -408,6 +417,8 @@ class SimpleTrainer:
                 save_path=f"{out_dir}/output.csv",
                 h=self.H,
                 w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
                 loss=self.cfg["cali_loss_type"],
             )
 

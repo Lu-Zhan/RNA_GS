@@ -41,7 +41,7 @@ def get_index_cos(pred_code, codebook):
 
 
 #(gzx):读入的codebook_path
-def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'data/codebook.xlsx'):
+def write_to_csv(pixel_coords, alpha, save_path, h, w, image,ref=None,post_processing=False,codebook_path = 'data/codebook.xlsx'):
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
     rna_name = read_codebook_name(path=codebook_path)
@@ -49,9 +49,6 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'da
     pred_code = alpha
 
     scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
-    indexs = indexs.data.cpu().numpy()
-    scores = scores.data.cpu().numpy()
-    pred_name = rna_name[indexs]  # (num_samples,)
 
     px = pixel_coords.data.cpu().numpy()[:, 0]
     py = pixel_coords.data.cpu().numpy()[:, 1]
@@ -60,6 +57,29 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'da
     py = py.astype(np.int16)
     px = np.clip(px, 0, w - 1)
     py = np.clip(py, 0, h - 1)
+    
+    #(gzx):后处理
+    
+    if post_processing == False:
+        indexs = indexs.data.cpu().numpy()
+        scores = scores.data.cpu().numpy()
+        
+    else:
+        pos_threshold = 30.0
+        ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
+        # for i in range(20):
+        #     print(ref_scores[i*20:i*20+20])
+
+        scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
+        indexs = indexs.data.cpu().numpy()
+        
+        total_scores = ref_scores * scores
+        scores = total_scores.data.cpu().numpy() 
+
+        
+    pred_name = rna_name[indexs]  # (num_samples,)
+     
+
 
     
     df = pd.DataFrame(
@@ -86,6 +106,7 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'da
         count_vaild_class(score=scores, class_index=indexs, th=0.98),
     )
 
+    image = ref.max(dim=2)[0]  
     image = np.tile(image.cpu().numpy()[..., None], [1, 1, 3])
 
     draw_results(
@@ -101,6 +122,8 @@ def write_to_csv_hamming(
     h,
     w,
     image,
+    ref=None,
+    post_processing=False,
     codebook_path="./data/codebook.xlsx",
     loss="mean",
 ):
@@ -175,7 +198,19 @@ def write_to_csv_hamming(
     #     "number of vaild class (th=0.95)",
     #     count_vaild_class(score=scores, class_index=indexs, th=0.98),
     # )
+    
+    #(gzx):后处理
+    
+    if post_processing:
+        pos_threshold = 30.0
+        ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
+        # for i in range(20):
+        #     print(ref_scores[i*20:i*20+20])
+        min_distance_values = 1 - min_distance_values
+        
+        min_distance_values = 1 - ref_scores * min_distance_values
 
+    image = ref.max(dim=2)[0]
     image = np.tile(image.cpu().numpy()[..., None], [1, 1, 3])
 
     draw_results(
@@ -200,6 +235,7 @@ def draw_results(image, px, py, pred_name, scores, save_path):
     scores = scores
     # # scores = (scores - 0.95) / 0.05
     # # scores = np.clip(scores, 0, 1)
+    # ax.scatter(py, px, alpha=scores, cmap=cm.jet, s=2)
     ax.scatter(px, py, alpha=scores, cmap=cm.jet, s=2)
 
     # for i, txt in enumerate(pred_name):
