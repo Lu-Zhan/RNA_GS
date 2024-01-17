@@ -178,3 +178,36 @@ def codebook_hamming_loss(pred_code, codebook, mode):
     min_dist = hamming_distance.min(dim=-1)[0]
     min_list = hamming_distance.min(dim=-1)[1]
     return min_dist.mean(), min_dist
+
+
+# (lz) compute sigma_x and sigma_y from conics
+def obtain_sigma_xy(conics):
+    # conics is a tensor of shape (N, 3), inverse covariance matrix in upper triangular format, whose unit is pixel
+    # recover to covariance matrix
+    inv_cov = torch.cat([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
+    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
+
+    cov = torch.inverse(inv_cov)    # (N, 2, 2)
+
+    sigma_x = torch.sqrt(cov[:, 0, 0])    # (N, )
+    sigma_y = torch.sqrt(cov[:, 1, 1])    # (N, )
+
+    return sigma_x, sigma_y
+
+
+# (lz) circle loss for 2D gaussian kernal
+def circle_loss(sigma_x, sigma_y):
+    # the difference betwwen sigma_x and sigma_y should be small
+    # sigma_x and sigma_y are tensors of shape (N, )
+
+    return ((sigma_x - sigma_y) ** 2).mean()
+
+
+# (lz) size loss for 2D gaussian kernal
+def size_loss(sigma_x, sigma_y, min_size=6, max_size=12):
+    # sigma_x or sigma_y should be in a certain range of [6, 12]
+
+    loss_x = torch.relu(min_size - sigma_x).mean() + torch.relu(max_size - 12).mean()
+    loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(max_size - 12).mean()
+
+    return loss_x + loss_y
