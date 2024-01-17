@@ -27,6 +27,9 @@ from losses import (
     obtain_sigma_xy,
     size_loss,
     circle_loss,
+    obtain_sigma_xy,
+    size_loss,
+    circle_loss,
 )
 
 from utils import (
@@ -241,46 +244,6 @@ class SimpleTrainer:
 
             # (zwx) loss for calibration
             flag = True
-            alpha = torch.sigmoid(self.rgbs)
-            loss_scale = scale_loss(self.scales[:, 0], self.scales[:, 1])
-            
-            if self.cfg["cali_loss_type"] == "cos":
-                loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
-            else:
-                if flag:
-                    loss_cos_dist, _ = codebook_hamming_loss(
-                        alpha, self.codebook, "normal"
-                    )
-                else:
-                    if self.cfg["cali_loss_type"] == "mean":
-                        loss_cos_dist, _ = codebook_hamming_loss(
-                            alpha, self.codebook, "mean"
-                        )
-                    elif self.cfg["cali_loss_type"] == "median":
-                        loss_cos_dist, _ = codebook_hamming_loss(
-                            alpha, self.codebook, "median"
-                        )
-                    elif self.cfg["cali_loss_type"] == "li":
-                        loss_cos_dist, _ = li_codeloss(alpha, self.codebook)
-                    elif self.cfg["cali_loss_type"] == "otsu":
-                        loss_cos_dist, _ = otsu_codeloss(alpha, self.codebook)
-                if iter == 0:
-                    formal_code_loss = abs(loss_cos_dist.item())
-                elif (
-                    iter % 200 == 0
-                    and abs(formal_code_loss - loss_cos_dist) < 0.01
-                    and flag == True
-                ):
-                    # print(f'start using {self.cfg["cali_loss_type"]} as threshold')
-                    formal_code_loss = loss_cos_dist.item()
-                    flag = False
-                elif iter % 200 == 0:
-                    formal_code_loss = loss_cos_dist.item()
-                tolerance = 2 / 15.0
-                if loss_cos_dist < tolerance:
-                    loss_cos_dist = 0
-                else:
-                    loss_cos_dist -= tolerance
 
             loss = 0
 
