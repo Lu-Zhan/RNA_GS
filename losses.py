@@ -207,8 +207,8 @@ def circle_loss(sigma_x, sigma_y):
 def size_loss(sigma_x, sigma_y, min_size=6, max_size=12):
     # sigma_x or sigma_y should be in a certain range of [6, 12]
 
-    loss_x = torch.relu(min_size - sigma_x).mean() + torch.relu(max_size - 12).mean()
-    loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(max_size - 12).mean()
+    loss_x = torch.relu(min_size - sigma_x).mean() + torch.relu(sigma_x - max_size).mean()
+    loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(sigma_y - max_size).mean()
 
     return loss_x + loss_y
 
