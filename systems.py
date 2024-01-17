@@ -20,10 +20,17 @@ from losses import (
     masked_l1_loss,
     bg_loss,
     ssim_loss,
+    codebook_loss,
     codebook_cos_loss,
     li_codeloss,
     otsu_codeloss,
     codebook_hamming_loss,
+    obtain_sigma_xy,
+    size_loss,
+    circle_loss,
+    obtain_sigma_xy,
+    size_loss,
+    circle_loss,
     obtain_sigma_xy,
     size_loss,
     circle_loss,
@@ -64,6 +71,9 @@ class SimpleTrainer:
         self.prune_threshold = cfg["prune_threshold"]
         self.grad_threshold = cfg["grad_threshold"]
         self.gauss_threshold = cfg["gauss_threshold"]
+        self.prune_flag = cfg["prune_flag"]
+        self.split_flag = cfg["split_flag"]
+        self.clone_flag = cfg["clone_flag"]
         self.densification_interval = densification_interval
         # self.kernal_size = kernal_size
 
@@ -184,7 +194,7 @@ class SimpleTrainer:
         for iter in range(iterations):
             
             #(gzx)
-            if iter % (self.densification_interval + 1) == 0 and iter > 0:
+            if iter % (self.densification_interval + 1) == 0 and iter > 0 and self.prune_flag:
                 indices_to_remove = (torch.sigmoid(self.rgbs).max(dim=-1)[0]  < self.prune_threshold).nonzero(as_tuple=True)[0]
 
                 if len(indices_to_remove) > 0:
@@ -274,7 +284,7 @@ class SimpleTrainer:
                 loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
                 loss += self.cfg["w_size"] * loss_size
             if self.cfg["w_code_cos"] > 0:
-                loss_cos_dist, flag = codebook_cos_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter)
+                loss_cos_dist, flag = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter)
                 loss += self.cfg["w_code_cos"] * loss_cos_dist
 
             optimizer.zero_grad()
@@ -289,7 +299,7 @@ class SimpleTrainer:
                 self.quats.grad.data [~self.persistent_mask] = 0.0
                 self.rgbs.grad.data  [~self.persistent_mask] = 0.0  
             #(gzx)
-            if iter % self.densification_interval == 0 and iter > 0:
+            if iter % self.densification_interval == 0 and iter > 0 and (self.split_flag or self.clone_flag):
                 # Calculate the norm of gradients
                 gradient_norms = torch.norm(self.means.grad[self.persistent_mask], dim=1, p=2)
                 gaussian_norms = torch.norm(torch.sigmoid(self.scales.data[self.persistent_mask]), dim=1, p=2)
@@ -308,7 +318,7 @@ class SimpleTrainer:
                 distinct_indices = large_gradient_indices[~common_indices_mask]
 
                 # Split points with large coordinate gradient and large gaussian values and descale their gaussian
-                if len(common_indices) > 0:
+                if len(common_indices) > 0 and self.split_flag:
                     print(f"number of splitted points: {len(common_indices)}")
                     start_index = self.current_marker + 1
                     end_index = self.current_marker + 1 + len(common_indices)
@@ -324,7 +334,7 @@ class SimpleTrainer:
                     self.current_marker = self.current_marker + len(common_indices)
 
                 # Clone it points with large coordinate gradient and small gaussian values
-                if len(distinct_indices) > 0:
+                if len(distinct_indices) > 0 and self.clone_flag:
                     print(f"number of cloned points: {len(distinct_indices)}")
                     start_index = self.current_marker + 1
                     end_index = self.current_marker + 1 + len(distinct_indices)
