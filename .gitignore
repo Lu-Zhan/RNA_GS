@@ -2,3 +2,7 @@ exps/
 outputs/
 wandb/
 *.pyc
+data/
+__pycache__
+*.out
+RNA_GS.sh

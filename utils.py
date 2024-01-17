@@ -3,6 +3,9 @@ import torch
 
 import numpy as np
 import pandas as pd
+import cv2
+from pathlib import Path
+from skimage import filters
 
 
 def read_codebook(path):
@@ -33,7 +36,7 @@ def get_index_cos(pred_code, codebook):
     return max_value, index
 
 
-def write_to_csv(pixel_coords, alpha, save_path, h, w, image, codebook_path='../data/codebook.xlsx'):
+def write_to_csv(pixel_coords, alpha, save_path, h, w, image, codebook_path='data/1213_demo_data_v2/codebook.xlsx'):
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
     rna_name = read_codebook_name(path=codebook_path)
@@ -73,6 +76,82 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image, codebook_path='../
     draw_results(image, px, py, pred_name, scores, save_path.replace('.csv', '_vis_blank.png'))
 
 
+def write_to_csv_hamming(
+    pixel_coords,
+    alpha,
+    save_path,
+    h,
+    w,
+    image,
+    codebook_path="data/1213_demo_data_v2/codebook.xlsx",
+    loss="mean",
+):
+    codebook = read_codebook(path=codebook_path)
+    codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
+    expanded_codebook = codebook.unsqueeze(0)
+    rna_name = read_codebook_name(path=codebook_path)
+
+    if loss == "mean":
+        sorted_ranks, _ = torch.sort(alpha, dim=0)
+        # 计算每列前70%的阈值
+        threshold = sorted_ranks[int(0.7 * alpha.size(0))]
+        pred_code_bin = torch.where(alpha > threshold, torch.tensor(1), torch.tensor(0))
+    elif loss == "median":
+        threshold = torch.median(alpha)
+        pred_code_bin = torch.where(alpha > threshold, torch.tensor(1), torch.tensor(0))
+    elif loss == "li":
+        pred_code_bin = torch.zeros_like(alpha)
+        for i in range(alpha.shape[1]):
+            # 取出同一张图片的alpha
+            image = alpha[:, i]
+            image_np = np.asarray(image.detach().cpu())
+            best_threshold = filters.threshold_li(image_np)
+            # 与阈值进行比较
+            binary_image = image > best_threshold
+            pred_code_bin[:, i] = binary_image
+    expanded_pred_code = pred_code_bin.unsqueeze(1)
+    hamming_distance = (expanded_pred_code != expanded_codebook).sum(
+        dim=2
+    ).float() / codebook.shape[1]
+    # min_index = torch.argmin(hamming_distance, dim=1, keepdim=True)
+    min_distance_values, min_index = torch.min(hamming_distance, dim=1, keepdim=True)
+    pred_name = [
+        rna_name[int(min_index[x].item())].replace("'", "")
+        for x in range(min_index.shape[0])
+    ]
+
+    px = pixel_coords.data.cpu().numpy()[:, 0]
+    py = pixel_coords.data.cpu().numpy()[:, 1]
+
+    px = px.astype(np.int16)
+    py = py.astype(np.int16)
+    px = np.clip(px, 0, w - 1)
+    py = np.clip(py, 0, h - 1)
+
+    df = pd.DataFrame(
+        {
+            "x": px,
+            "y": py,
+            "gene": pred_name,
+            "index": (min_index + 1).flatten().data.cpu().numpy(),
+            "min_distance_value": min_distance_values,
+        }
+    )
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    df.to_csv(save_path, index=False)
+    image = np.tile(image.cpu().numpy()[..., None], [1, 1, 3])
+
+    draw_results(
+        image,
+        px,
+        py,
+        pred_name,
+        1 - min_distance_values,
+        save_path.replace(".csv", "_vis_blank.png"),
+    )
+
+
 def draw_results(image, px, py, pred_name, scores, save_path):
     # draw scatter plot on the image no 1, score is the alpha value
     
@@ -94,7 +173,7 @@ def draw_results(image, px, py, pred_name, scores, save_path):
 
 
 def count_vaild_pixel(score, th=0.9):
-    return (score > 0.9).sum()
+    return (score > th).sum()
 
 
 def count_vaild_class(score, class_index, th=0.9):

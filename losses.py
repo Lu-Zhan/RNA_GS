@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import pandas as pd
 import torch.nn.functional as F
+from skimage import filters
 
 
 l1_loss = torch.nn.L1Loss()
@@ -92,3 +93,66 @@ def ssim(img1, img2, window_size=11, size_average=True):
 
 def ssim_loss(img1, img2, window_size=7, size_average=True):
     return ssim(img1, img2, window_size, size_average).mean()
+
+
+def li_codeloss(pred_code, codebook):
+    pred_code_bin = torch.zeros_like(pred_code)
+    for i in range(pred_code.shape[1]):
+        # 取出同一张图片的alpha
+        image = pred_code[:, i]
+        image_np = np.asarray(image.detach().cpu())
+        best_threshold = filters.threshold_li(image_np)
+        # 与阈值进行比较
+        binary_image = image > best_threshold
+        pred_code_bin[:, i] = binary_image
+    expanded_pred_code = pred_code_bin.unsqueeze(1)
+    expanded_codebook = codebook.unsqueeze(0)
+    hamming_distance = (expanded_pred_code != expanded_codebook).sum(
+        dim=2
+    ) / codebook.shape[1]
+    min_dist = hamming_distance.min(dim=-1)[0]
+    min_list = hamming_distance.min(dim=-1)[1]
+    return min_dist.mean(), min_dist
+
+
+def otsu_codeloss(pred_code, codebook):
+    pred_code_bin = torch.zeros_like(pred_code)
+    for i in range(pred_code.shape[1]):
+        # 取出同一张图片的alpha
+        image = pred_code[:, i]
+        image_np = np.asarray(image.detach().cpu())
+        best_threshold = filters.threshold_otsu(image_np)
+        # 与阈值进行比较
+        binary_image = image > best_threshold
+        pred_code_bin[:, i] = binary_image
+    expanded_pred_code = pred_code_bin.unsqueeze(1)
+    expanded_codebook = codebook.unsqueeze(0)
+    hamming_distance = (expanded_pred_code != expanded_codebook).sum(
+        dim=2
+    ) / codebook.shape[1]
+    min_dist = hamming_distance.min(dim=-1)[0]
+    min_list = hamming_distance.min(dim=-1)[1]
+    return min_dist.mean(), min_dist
+
+
+def codebook_hamming_loss(pred_code, codebook, mode):
+    if mode == "normal":
+        threshold = 0.5
+    elif mode == "mean":
+        sorted_ranks, _ = torch.sort(pred_code, dim=0)
+        # 计算每列前70%的阈值
+        threshold = sorted_ranks[int(0.7 * pred_code.size(0))]
+    elif mode == "median":
+        threshold = torch.median(pred_code, dim=0).values
+    else:
+        print("code loss mode error")
+        threshold = 0
+    pred_code_bin = torch.where(pred_code > threshold, torch.tensor(1), torch.tensor(0))
+    expanded_pred_code = pred_code_bin.unsqueeze(1)
+    expanded_codebook = codebook.unsqueeze(0)
+    hamming_distance = (expanded_pred_code != expanded_codebook).sum(
+        dim=2
+    ) / codebook.shape[1]
+    min_dist = hamming_distance.min(dim=-1)[0]
+    min_list = hamming_distance.min(dim=-1)[1]
+    return min_dist.mean(), min_dist
