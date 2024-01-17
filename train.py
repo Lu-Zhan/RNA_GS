@@ -29,7 +29,9 @@ def main(
         0,
         0.001,
         0.1,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, scale
+        0,
+        0
+    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size
     thresholds: list[float] = [
         0.3,
         0.04,
@@ -44,7 +46,8 @@ def main(
         "w_bg": weights[4],
         "w_ssim": weights[5],
         "w_code_cos": weights[6],
-        "w_scale": weights[7],
+        "w_circle": weights[7],
+        "w_size": weights[8],
         "prune_threshold" : thresholds[0],
         "grad_threshold" : thresholds[1],
         "gauss_threshold" : thresholds[2],
