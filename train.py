@@ -11,7 +11,8 @@ from preprocess import images_to_tensor
 def main(
     height: int = 256,
     width: int = 256,
-    num_points: int = 8000,
+    primary_samples: int = 8000,
+    backup_samples: int = 8000,
     save_imgs: bool = True,
     img_path: Optional[Path] = Path("data/1213_demo_data_v2/raw1"),
     codebook_path: Optional[Path] = Path("data/codebook.xlsx"),
@@ -29,12 +30,18 @@ def main(
         0,
         0.001,
         0.1,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
+        0,
+    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size
     thresholds: list[float] = [
         0.3,
         0.04,
         0.04,
     ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
+    dens_flags: list[int] = [
+        False,
+        False,
+        False
+    ]  # l1, l2, lml1, lml2, bg, ssim, code_cos
 ) -> None:
     config = {
         "w_l1": weights[0],
@@ -44,13 +51,20 @@ def main(
         "w_bg": weights[4],
         "w_ssim": weights[5],
         "w_code_cos": weights[6],
-        "w_scale": weights[7],
+        "w_circle": weights[7],
+        "w_size": weights[8],
         "prune_threshold" : thresholds[0],
         "grad_threshold" : thresholds[1],
         "gauss_threshold" : thresholds[2],
+        "prune_flag" : dens_flags[0],
+        "split_flag" : dens_flags[1],
+        "clone_flag" : dens_flags[2],        
         "exp_name": exp_name,
         "codebook_path": codebook_path,
         "cali_loss_type": cali_loss_type,
+        "primary_samples": primary_samples,
+        "backup_samples": backup_samples,
+        "densification_interval": densification_interval,
     }
 
     wandb.init(
@@ -73,7 +87,8 @@ def main(
 
     trainer = SimpleTrainer(
         gt_image=gt_image,
-        num_points=num_points,
+        primary_samples=primary_samples,
+        backup_samples=backup_samples,
         cfg=config,
         image_file_name=img_path,
         densification_interval=densification_interval,

@@ -20,10 +20,17 @@ from losses import (
     masked_l1_loss,
     bg_loss,
     ssim_loss,
+    codebook_loss,
     codebook_cos_loss,
     li_codeloss,
     otsu_codeloss,
     codebook_hamming_loss,
+    obtain_sigma_xy,
+    size_loss,
+    circle_loss,
+    obtain_sigma_xy,
+    size_loss,
+    circle_loss,
 )
 
 from utils import (
@@ -42,24 +49,25 @@ class SimpleTrainer:
     def __init__(
         self,
         gt_image: Tensor,
-        num_points: int = 8000,
         primary_samples: int = 20000,
         backup_samples: int = 8000,
         image_file_name: Path = "",
         image_size: list = [401, 401, 3],
-        # kernal_size: int = 25,
-        densification_interval:int = 1000,
+        densification_interval: int = 1000,
         cfg: Optional[dict] = None,
     ):
         self.device = torch.device("cuda:0")
         self.gt_image = gt_image.to(device=self.device)
-        self.num_points = num_points
+        # self.num_points = num_points
         self.primary_samples = primary_samples
         self.backup_samples = backup_samples
         self.image_size = image_size
         self.prune_threshold = cfg["prune_threshold"]
         self.grad_threshold = cfg["grad_threshold"]
         self.gauss_threshold = cfg["gauss_threshold"]
+        self.prune_flag = cfg["prune_flag"]
+        self.split_flag = cfg["split_flag"]
+        self.clone_flag = cfg["clone_flag"]
         self.densification_interval = densification_interval
         # self.kernal_size = kernal_size
 
@@ -180,7 +188,7 @@ class SimpleTrainer:
         for iter in range(iterations):
             
             #(gzx)
-            if iter % (self.densification_interval + 1) == 0 and iter > 0:
+            if iter % (self.densification_interval + 1) == 0 and iter > 0 and self.prune_flag:
                 indices_to_remove = (torch.sigmoid(self.rgbs).max(dim=-1)[0]  < self.prune_threshold).nonzero(as_tuple=True)[0]
 
                 if len(indices_to_remove) > 0:
@@ -236,87 +244,41 @@ class SimpleTrainer:
 
             times[1] += time.time() - start
 
-            # losses for reconstruction
-            loss_l1 = l1_loss(out_img, self.gt_image)
-            loss_mse = mse_loss(out_img, self.gt_image)
-            loss_masked_mse = masked_mse_loss(out_img, self.gt_image)
-            loss_masked_l1 = masked_l1_loss(out_img, self.gt_image)
-            loss_bg = bg_loss(out_img, self.gt_image)
-            loss_ssim = ssim_loss(out_img, self.gt_image)
-
             # (zwx) loss for calibration
             flag = True
-            scale_x = torch.sigmoid(self.scales[:, 0])
-            scale_y = torch.sigmoid(self.scales[:, 1])
-            alpha = torch.sigmoid(self.rgbs)
-            diff_x = scale_x - torch.clamp(scale_x, 0.12, 0.24)
-            diff_y = scale_y - torch.clamp(scale_x, 0.12, 0.24)
-            # sigma -> axis length, need modification
-            scale_loss_x = torch.where(
-                torch.abs(diff_x) < 0.5,
-                0.5 * diff_x**2,
-                0.5 * (torch.abs(diff_x) - 0.5 * 0.5),
-            )
-            scale_loss_y = torch.where(
-                torch.abs(diff_y) < 0.5,
-                0.5 * diff_y**2,
-                0.5 * (torch.abs(diff_y) - 0.5 * 0.5),
-            )
-            scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
-
-            if self.cfg["cali_loss_type"] == "cos":
-                loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
-            else:
-                if flag:
-                    loss_cos_dist, _ = codebook_hamming_loss(
-                        alpha, self.codebook, "normal"
-                    )
-                else:
-                    if self.cfg["cali_loss_type"] == "mean":
-                        loss_cos_dist, _ = codebook_hamming_loss(
-                            alpha, self.codebook, "mean"
-                        )
-                    elif self.cfg["cali_loss_type"] == "median":
-                        loss_cos_dist, _ = codebook_hamming_loss(
-                            alpha, self.codebook, "median"
-                        )
-                    elif self.cfg["cali_loss_type"] == "li":
-                        loss_cos_dist, _ = li_codeloss(alpha, self.codebook)
-                if iter == 0:
-                    formal_code_loss = abs(loss_cos_dist.item())
-                elif (
-                    iter % 200 == 0
-                    and abs(formal_code_loss - loss_cos_dist) < 0.01
-                    and flag == True
-                ):
-                    # print(f'start using {self.cfg["cali_loss_type"]} as threshold')
-                    formal_code_loss = loss_cos_dist.item()
-                    flag = False
-                elif iter % 200 == 0:
-                    formal_code_loss = loss_cos_dist.item()
-                tolerance = 2 / 15.0
-                if loss_cos_dist < tolerance:
-                    loss_cos_dist = 0
-                else:
-                    loss_cos_dist -= tolerance
-
+            alpha = torch.sigmoid(persist_rgbs)
             loss = 0
 
+            # (lz) count loss required for training
+            if self.cfg["w_circle"] > 0 or self.cfg["w_size"] > 0:
+                sigma_x, sigma_y = obtain_sigma_xy(conics)
+
             if self.cfg["w_l1"] > 0:
+                loss_l1 = l1_loss(out_img, self.gt_image)
                 loss += self.cfg["w_l1"] * loss_l1
             if self.cfg["w_l2"] > 0:
+                loss_mse = mse_loss(out_img, self.gt_image)
                 loss += self.cfg["w_l2"] * loss_mse
             if self.cfg["w_lml1"] > 0:
+                loss_masked_l1 = masked_l1_loss(out_img, self.gt_image)
                 loss += self.cfg["w_lml1"] * loss_masked_l1
             if self.cfg["w_lml2"] > 0:
+                loss_masked_mse = masked_mse_loss(out_img, self.gt_image)
                 loss += self.cfg["w_lml2"] * loss_masked_mse
             if self.cfg["w_bg"] > 0:
+                loss_bg = bg_loss(out_img, self.gt_image)
                 loss += self.cfg["w_bg"] * loss_bg
             if self.cfg["w_ssim"] > 0:
+                loss_ssim = ssim_loss(out_img, self.gt_image)
                 loss += self.cfg["w_ssim"] * loss_ssim
-            if self.cfg["w_scale"] > 0:
-                loss += self.cfg["w_scale"] * scale_loss
+            if self.cfg["w_circle"] > 0:
+                loss_circle = circle_loss(sigma_x, sigma_y)
+                loss += self.cfg["w_circle"] * loss_circle
+            if self.cfg["w_size"] > 0:
+                loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
+                loss += self.cfg["w_size"] * loss_size
             if self.cfg["w_code_cos"] > 0:
+                loss_cos_dist, flag = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter)
                 loss += self.cfg["w_code_cos"] * loss_cos_dist
 
             optimizer.zero_grad()
@@ -331,7 +293,7 @@ class SimpleTrainer:
                 self.quats.grad.data [~self.persistent_mask] = 0.0
                 self.rgbs.grad.data  [~self.persistent_mask] = 0.0  
             #(gzx)
-            if iter % self.densification_interval == 0 and iter > 0:
+            if iter % self.densification_interval == 0 and iter > 0 and (self.split_flag or self.clone_flag):
                 # Calculate the norm of gradients
                 gradient_norms = torch.norm(self.means.grad[self.persistent_mask], dim=1, p=2)
                 gaussian_norms = torch.norm(torch.sigmoid(self.scales.data[self.persistent_mask]), dim=1, p=2)
@@ -350,12 +312,12 @@ class SimpleTrainer:
                 distinct_indices = large_gradient_indices[~common_indices_mask]
 
                 # Split points with large coordinate gradient and large gaussian values and descale their gaussian
-                if len(common_indices) > 0:
+                if len(common_indices) > 0 and self.split_flag:
                     print(f"number of splitted points: {len(common_indices)}")
                     start_index = self.current_marker + 1
                     end_index = self.current_marker + 1 + len(common_indices)
                     self.persistent_mask[start_index: end_index] = True
-                    self.mean.data[start_index:end_index, :]   = self.mean.data[common_indices, :]
+                    self.means.data[start_index:end_index, :]  = self.means.data[common_indices, :]  # (zwx) mean -> means
                     self.scales.data[start_index:end_index, :] = self.scales.data[common_indices, :]
                     self.quats.data[start_index:end_index, :]  = self.quats.data[common_indices, :]
                     self.rgbs.data[start_index:end_index, :]   = self.rgbs.data[common_indices, :]  
@@ -366,12 +328,12 @@ class SimpleTrainer:
                     self.current_marker = self.current_marker + len(common_indices)
 
                 # Clone it points with large coordinate gradient and small gaussian values
-                if len(distinct_indices) > 0:
+                if len(distinct_indices) > 0 and self.clone_flag:
                     print(f"number of cloned points: {len(distinct_indices)}")
                     start_index = self.current_marker + 1
                     end_index = self.current_marker + 1 + len(distinct_indices)
                     self.persistent_mask[start_index: end_index] = True
-                    self.mean.data[start_index:end_index, :]   = self.mean.data[distinct_indices, :]
+                    self.means.data[start_index:end_index, :]  = self.means.data[distinct_indices, :]
                     self.scales.data[start_index:end_index, :] = self.scales.data[distinct_indices, :]
                     self.quats.data[start_index:end_index, :]  = self.quats.data[distinct_indices, :]
                     self.rgbs.data[start_index:end_index, :]   = self.rgbs.data[distinct_indices, :]  
@@ -380,60 +342,27 @@ class SimpleTrainer:
             times[2] += time.time() - start
             optimizer.step()
 
-            with torch.no_grad():
-                if save_imgs and iter % 100 == 0:
-                    # count psnr for each channel, out_img: [h, w, 15]
-                    psnr = []
-
-                    for i in range(15):
-                        mse = torch.mean(
-                            (out_img[..., i] - self.gt_image[..., i]) ** 2
-                        ).cpu()
-                        psnr.append(float(10 * torch.log10(1 / mse)))
-
-                    mean_mse = torch.mean((out_img - self.gt_image) ** 2).cpu()
-                    mean_psnr = float(10 * torch.log10(1 / mean_mse))
-
-                    #(gzx):检查时间
-                    # if (iter%self.densification_interval==0):
-                    #     print(f"Iter1-{iter+1} use{(time.time()-start0):.2f}s.")
-                    
-                    print(
-                        f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, L: {loss:.7f}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}"
-                    )
-
-                    wandb.log(
-                        {
-                            "point_number": persist_rgbs.shape[0],
-                            "loss/total": loss,
-                            "loss/l2": loss_mse,
-                            "loss/l1": loss_l1,
-                            "loss/lml2": loss_masked_mse,
-                            "loss/lml1": loss_masked_l1,
-                            "loss/bg": loss_bg,
-                            "loss/ssim": loss_ssim,
-                            "loss/code_cos": loss_cos_dist,
-                            "loss/scale_loss": scale_loss,
-                            "psnr/mean": mean_psnr,
-                        },
-                        step=iter,
-                    )
-
-                    wandb.log(
-                        {f"psnr/image_{i}": psnr[i] for i in range(15)}, step=iter
-                    )
-
-                if save_imgs and iter % 500 == 0:
-                    view = view_output(out_img, self.gt_image)
-                    frames.append(view)
-
-                    # save last view
-                    Image.fromarray(view).save(
-                        f"{out_dir}/last.png",
-                    )
-
-                    wandb.log({"view/recon": wandb.Image(view)}, step=iter)
-
+            self.validation(
+                save_imgs=save_imgs, 
+                loss=loss, 
+                out_img=out_img, 
+                persist_rgbs=persist_rgbs, 
+                conics=conics, 
+                alpha=torch.sigmoid(persist_rgbs), 
+                iter=iter, 
+                iterations=iterations, 
+                frames=frames, 
+                out_dir=out_dir,
+            )
+        
+        # (zwx) print code loss
+        print("test_li:", li_codeloss(torch.sigmoid(persist_rgbs), self.codebook)[0].item(),
+              "test_otsu:", otsu_codeloss(torch.sigmoid(persist_rgbs), self.codebook)[0].item(),
+              "test_hamming_normal:", codebook_hamming_loss(torch.sigmoid(persist_rgbs), self.codebook, "normal")[0].item(),
+              "test_hamming_mean:", codebook_hamming_loss(torch.sigmoid(persist_rgbs), self.codebook, "mean")[0].item(),
+              "test_hamming_median:", codebook_hamming_loss(torch.sigmoid(persist_rgbs), self.codebook, "median")[0].item()
+        )
+        
         if save_imgs:
             # save them as a gif with PIL
             frames = [Image.fromarray(frame) for frame in frames]
@@ -473,14 +402,94 @@ class SimpleTrainer:
             self.cfg["cali_loss_type"] == "mean"
             or self.cfg["cali_loss_type"] == "median"
             or self.cfg["cali_loss_type"] == "li"
+            or self.cfg["cali_loss_type"] == "otsu"
         ):
             write_to_csv_hamming(
                 image=self.gt_image[..., 0],
                 pixel_coords=xys,
-                alpha=self.rgbs,
+                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
                 save_path=f"{out_dir}/output.csv",
                 h=self.H,
                 w=self.W,
                 loss=self.cfg["cali_loss_type"],
             )
 
+    # (lz) separate validation function
+    @torch.no_grad()
+    def validation(self, save_imgs, loss, out_img, persist_rgbs, conics, alpha, iter, iterations, frames, out_dir):
+        if save_imgs and iter % 100 == 0:
+            # count loss for validation
+            sigma_x, sigma_y = obtain_sigma_xy(conics)
+            loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
+            loss_circle = circle_loss(sigma_x, sigma_y)
+
+            loss_l1 = l1_loss(out_img, self.gt_image)
+            loss_mse = mse_loss(out_img, self.gt_image)
+            loss_masked_l1 = masked_l1_loss(out_img, self.gt_image)
+            loss_masked_mse = masked_mse_loss(out_img, self.gt_image)
+            loss_bg = bg_loss(out_img, self.gt_image)
+            loss_ssim = ssim_loss(out_img, self.gt_image)
+
+            loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
+            loss_nml_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "normal")
+            loss_mean_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "mean")
+            loss_median_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "median")
+            loss_li_hm_dist, _ = li_codeloss(alpha, self.codebook)
+            loss_otsu_hm_dist, _ = otsu_codeloss(alpha, self.codebook)
+
+            # count psnr for each channel, out_img: [h, w, 15]
+            psnr = []
+
+            for i in range(15):
+                mse = torch.mean(
+                    (out_img[..., i] - self.gt_image[..., i]) ** 2
+                ).cpu()
+                psnr.append(float(10 * torch.log10(1 / mse)))
+
+            mean_mse = torch.mean((out_img - self.gt_image) ** 2).cpu()
+            mean_psnr = float(10 * torch.log10(1 / mean_mse))
+
+            print(
+                f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}"
+            )
+
+            wandb.log(
+                {
+                    "point_number": persist_rgbs.shape[0],
+                    "loss/total": loss,
+                    "loss/l2": loss_mse,
+                    "loss/l1": loss_l1,
+                    "loss/lml2": loss_masked_mse,
+                    "loss/lml1": loss_masked_l1,
+                    "loss/bg": loss_bg,
+                    "loss/ssim": loss_ssim,
+                    "loss/code_cos": loss_cos_dist,
+                    "loss/loss_circle": loss_circle,
+                    "loss/size_loss": loss_size,
+                    "psnr/mean": mean_psnr,
+                    "dist/loss_nml_hm_dist": loss_nml_hm_dist,
+                    "dist/loss_mean_hm_dist": loss_mean_hm_dist,
+                    "dist/loss_median_hm_dist": loss_median_hm_dist,
+                    "dist/loss_li_hm_dist": loss_li_hm_dist,
+                    "dist/loss_otsu_hm_dist": loss_otsu_hm_dist,
+                },
+                step=iter,
+            )
+
+            wandb.log(
+                {f"psnr/image_{i}": psnr[i] for i in range(15)}, step=iter
+            )
+
+        if save_imgs and iter % 500 == 0:
+            view = view_output(out_img, self.gt_image)
+            frames.append(view)
+
+            # save last view
+            Image.fromarray(view).save(
+                f"{out_dir}/last.png",
+            )
+
+            wandb.log({"view/recon": wandb.Image(view)}, step=iter)
+
+
+        
