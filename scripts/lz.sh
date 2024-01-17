@@ -1,6 +1,5 @@
 gpu=3
 
-
 CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --weights 0 1 0 0 0 0 0.001 0.001 \
     --iterations 20000 \
