@@ -263,7 +263,7 @@ class SimpleTrainer:
                 0.5 * (torch.abs(diff_y) - 0.5 * 0.5),
             )
             scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
-
+            
             if self.cfg["cali_loss_type"] == "cos":
                 loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
             else:
@@ -282,6 +282,8 @@ class SimpleTrainer:
                         )
                     elif self.cfg["cali_loss_type"] == "li":
                         loss_cos_dist, _ = li_codeloss(alpha, self.codebook)
+                    elif self.cfg["cali_loss_type"] == "otsu":
+                        loss_cos_dist, _ = otsu_codeloss(alpha, self.codebook)
                 if iter == 0:
                     formal_code_loss = abs(loss_cos_dist.item())
                 elif (
@@ -355,7 +357,7 @@ class SimpleTrainer:
                     start_index = self.current_marker + 1
                     end_index = self.current_marker + 1 + len(common_indices)
                     self.persistent_mask[start_index: end_index] = True
-                    self.mean.data[start_index:end_index, :]   = self.mean.data[common_indices, :]
+                    self.means.data[start_index:end_index, :]  = self.means.data[common_indices, :]  # (zwx) mean -> means
                     self.scales.data[start_index:end_index, :] = self.scales.data[common_indices, :]
                     self.quats.data[start_index:end_index, :]  = self.quats.data[common_indices, :]
                     self.rgbs.data[start_index:end_index, :]   = self.rgbs.data[common_indices, :]  
@@ -371,7 +373,7 @@ class SimpleTrainer:
                     start_index = self.current_marker + 1
                     end_index = self.current_marker + 1 + len(distinct_indices)
                     self.persistent_mask[start_index: end_index] = True
-                    self.mean.data[start_index:end_index, :]   = self.mean.data[distinct_indices, :]
+                    self.means.data[start_index:end_index, :]  = self.means.data[distinct_indices, :]
                     self.scales.data[start_index:end_index, :] = self.scales.data[distinct_indices, :]
                     self.quats.data[start_index:end_index, :]  = self.quats.data[distinct_indices, :]
                     self.rgbs.data[start_index:end_index, :]   = self.rgbs.data[distinct_indices, :]  
@@ -394,10 +396,6 @@ class SimpleTrainer:
                     mean_mse = torch.mean((out_img - self.gt_image) ** 2).cpu()
                     mean_psnr = float(10 * torch.log10(1 / mean_mse))
 
-                    #(gzx):检查时间
-                    # if (iter%self.densification_interval==0):
-                    #     print(f"Iter1-{iter+1} use{(time.time()-start0):.2f}s.")
-                    
                     print(
                         f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, L: {loss:.7f}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}"
                     )
@@ -433,7 +431,15 @@ class SimpleTrainer:
                     )
 
                     wandb.log({"view/recon": wandb.Image(view)}, step=iter)
-
+        
+        # (zwx) print code loss
+        print("test_li:", li_codeloss(torch.sigmoid(self.rgbs), self.codebook)[0].item(),
+              "test_otsu:", otsu_codeloss(torch.sigmoid(self.rgbs), self.codebook)[0].item(),
+              "test_hamming_normal:", codebook_hamming_loss(torch.sigmoid(self.rgbs), self.codebook, "normal")[0].item(),
+              "test_hamming_mean:", codebook_hamming_loss(torch.sigmoid(self.rgbs), self.codebook, "mean")[0].item(),
+              "test_hamming_median:", codebook_hamming_loss(torch.sigmoid(self.rgbs), self.codebook, "median")[0].item()
+        )
+        
         if save_imgs:
             # save them as a gif with PIL
             frames = [Image.fromarray(frame) for frame in frames]
@@ -473,6 +479,7 @@ class SimpleTrainer:
             self.cfg["cali_loss_type"] == "mean"
             or self.cfg["cali_loss_type"] == "median"
             or self.cfg["cali_loss_type"] == "li"
+            or self.cfg["cali_loss_type"] == "ostu"
         ):
             write_to_csv_hamming(
                 image=self.gt_image[..., 0],

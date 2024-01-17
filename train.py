@@ -29,7 +29,7 @@ def main(
         0,
         0.001,
         0.1,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
+    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, scale
     thresholds: list[float] = [
         0.3,
         0.04,
