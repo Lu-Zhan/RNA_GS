@@ -244,7 +244,7 @@ class SimpleTrainer:
 
             # (zwx) loss for calibration
             flag = True
-
+            alpha = torch.sigmoid(persist_rgbs)
             loss = 0
 
             # (lz) count loss required for training
