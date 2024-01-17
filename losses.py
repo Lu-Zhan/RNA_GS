@@ -178,3 +178,23 @@ def codebook_hamming_loss(pred_code, codebook, mode):
     min_dist = hamming_distance.min(dim=-1)[0]
     min_list = hamming_distance.min(dim=-1)[1]
     return min_dist.mean(), min_dist
+
+
+def scale_loss(scale_x, scale_y):
+    # sigma -> axis length, need modification
+    scale_x = torch.sigmoid(scale_x)
+    scale_y = torch.sigmoid(scale_y)
+    diff_x = scale_x - torch.clamp(scale_x, 0.12, 0.24)
+    diff_y = scale_y - torch.clamp(scale_x, 0.12, 0.24)
+    scale_loss_x = torch.where(
+        torch.abs(diff_x) < 0.5,
+        0.5 * diff_x**2,
+        0.5 * (torch.abs(diff_x) - 0.5 * 0.5),
+    )
+    scale_loss_y = torch.where(
+        torch.abs(diff_y) < 0.5,
+        0.5 * diff_y**2,
+        0.5 * (torch.abs(diff_y) - 0.5 * 0.5),
+    )
+    scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
+    return scale_loss

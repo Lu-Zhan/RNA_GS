@@ -61,6 +61,7 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image,codebook_path = 'da
     px = np.clip(px, 0, w - 1)
     py = np.clip(py, 0, h - 1)
 
+    
     df = pd.DataFrame(
         {"x": px, "y": py, "gene": pred_name, "index": indexs, "score": scores}
     )
@@ -100,7 +101,7 @@ def write_to_csv_hamming(
     h,
     w,
     image,
-    codebook_path="../data/codebook.xlsx",
+    codebook_path="./data/codebook.xlsx",
     loss="mean",
 ):
     codebook = read_codebook(path=codebook_path)
@@ -149,9 +150,9 @@ def write_to_csv_hamming(
         {
             "x": px,
             "y": py,
-            "gene": pred_name,
+            "gene": np.array(pred_name),
             "index": (min_index + 1).flatten().data.cpu().numpy(),
-            "min_distance_value": min_distance_values,
+            "min_distance_value": min_distance_values[:, 0].cpu().numpy(),
         }
     )
 
@@ -182,7 +183,7 @@ def write_to_csv_hamming(
         px,
         py,
         pred_name,
-        1 - min_distance_values,
+        1 - min_distance_values.cpu().numpy(),
         save_path.replace(".csv", "_vis_blank.png"),
     )
 

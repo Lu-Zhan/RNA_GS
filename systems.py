@@ -24,6 +24,7 @@ from losses import (
     li_codeloss,
     otsu_codeloss,
     codebook_hamming_loss,
+    scale_loss,
 )
 
 from utils import (
@@ -246,23 +247,8 @@ class SimpleTrainer:
 
             # (zwx) loss for calibration
             flag = True
-            scale_x = torch.sigmoid(self.scales[:, 0])
-            scale_y = torch.sigmoid(self.scales[:, 1])
             alpha = torch.sigmoid(self.rgbs)
-            diff_x = scale_x - torch.clamp(scale_x, 0.12, 0.24)
-            diff_y = scale_y - torch.clamp(scale_x, 0.12, 0.24)
-            # sigma -> axis length, need modification
-            scale_loss_x = torch.where(
-                torch.abs(diff_x) < 0.5,
-                0.5 * diff_x**2,
-                0.5 * (torch.abs(diff_x) - 0.5 * 0.5),
-            )
-            scale_loss_y = torch.where(
-                torch.abs(diff_y) < 0.5,
-                0.5 * diff_y**2,
-                0.5 * (torch.abs(diff_y) - 0.5 * 0.5),
-            )
-            scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
+            loss_scale = scale_loss(self.scales[:, 0], self.scales[:, 1])
             
             if self.cfg["cali_loss_type"] == "cos":
                 loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
@@ -317,7 +303,7 @@ class SimpleTrainer:
             if self.cfg["w_ssim"] > 0:
                 loss += self.cfg["w_ssim"] * loss_ssim
             if self.cfg["w_scale"] > 0:
-                loss += self.cfg["w_scale"] * scale_loss
+                loss += self.cfg["w_scale"] * loss_scale
             if self.cfg["w_code_cos"] > 0:
                 loss += self.cfg["w_code_cos"] * loss_cos_dist
 
@@ -484,7 +470,7 @@ class SimpleTrainer:
             write_to_csv_hamming(
                 image=self.gt_image[..., 0],
                 pixel_coords=xys,
-                alpha=self.rgbs,
+                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
                 save_path=f"{out_dir}/output.csv",
                 h=self.H,
                 w=self.W,
