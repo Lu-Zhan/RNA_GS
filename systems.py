@@ -241,7 +241,7 @@ class SimpleTrainer:
 
             # (zwx) loss for calibration
             flag = True
-            alpha = torch.sigmoid(self.rgbs)
+            alpha = torch.sigmoid(persist_rgbs)
 
             loss = 0
 
@@ -341,11 +341,11 @@ class SimpleTrainer:
             self.validation(save_imgs, loss, out_img, persist_rgbs, conics, alpha, iter, iterations, frames, out_dir)
         
         # (zwx) print code loss
-        print("test_li:", li_codeloss(torch.sigmoid(self.rgbs), self.codebook)[0].item(),
-              "test_otsu:", otsu_codeloss(torch.sigmoid(self.rgbs), self.codebook)[0].item(),
-              "test_hamming_normal:", codebook_hamming_loss(torch.sigmoid(self.rgbs), self.codebook, "normal")[0].item(),
-              "test_hamming_mean:", codebook_hamming_loss(torch.sigmoid(self.rgbs), self.codebook, "mean")[0].item(),
-              "test_hamming_median:", codebook_hamming_loss(torch.sigmoid(self.rgbs), self.codebook, "median")[0].item()
+        print("test_li:", li_codeloss(torch.sigmoid(persist_rgbs), self.codebook)[0].item(),
+              "test_otsu:", otsu_codeloss(torch.sigmoid(persist_rgbs), self.codebook)[0].item(),
+              "test_hamming_normal:", codebook_hamming_loss(torch.sigmoid(persist_rgbs), self.codebook, "normal")[0].item(),
+              "test_hamming_mean:", codebook_hamming_loss(torch.sigmoid(persist_rgbs), self.codebook, "mean")[0].item(),
+              "test_hamming_median:", codebook_hamming_loss(torch.sigmoid(persist_rgbs), self.codebook, "median")[0].item()
         )
         
         if save_imgs:
