@@ -27,6 +27,7 @@ from losses import (
     obtain_sigma_xy,
     size_loss,
     circle_loss,
+    codebook_loss,
 )
 
 from utils import (
@@ -241,6 +242,7 @@ class SimpleTrainer:
 
             # (zwx) loss for calibration
             flag = True
+            alpha = torch.sigmoid(persist_rgbs)
 
             loss = 0
 
@@ -273,7 +275,7 @@ class SimpleTrainer:
                 loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
                 loss += self.cfg["w_size"] * loss_size
             if self.cfg["w_code_cos"] > 0:
-                loss_cos_dist, flag = codebook_cos_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter)
+                loss_cos_dist, flag = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter)
                 loss += self.cfg["w_code_cos"] * loss_cos_dist
 
             optimizer.zero_grad()
@@ -414,10 +416,10 @@ class SimpleTrainer:
             loss_bg = bg_loss(out_img, self.gt_image)
             loss_ssim = ssim_loss(out_img, self.gt_image)
 
-            loss_cos_dist, _ = codebook_cos_loss("cos", alpha, self.codebook, flag=True, iter=iter)
-            loss_nml_hm_dist, _ = codebook_hamming_loss("normal", alpha, self.codebook, flag=True, iter=iter)
-            loss_mean_hm_dist, _ = codebook_hamming_loss("mean", alpha, self.codebook, flag=False, iter=iter)
-            loss_median_hm_dist, _ = codebook_hamming_loss("median", alpha, self.codebook, flag=False, iter=iter)
+            loss_cos_dist, _ = codebook_loss("cos", alpha, self.codebook, flag=True, iter=iter)  # (zwx) codebook_cos_loss -> codebook_loss
+            loss_nml_hm_dist, _ = codebook_loss("normal", alpha, self.codebook, flag=True, iter=iter)
+            loss_mean_hm_dist, _ = codebook_loss("mean", alpha, self.codebook, flag=False, iter=iter)
+            loss_median_hm_dist, _ = codebook_loss("median", alpha, self.codebook, flag=False, iter=iter)
             loss_li_hm_dist, _ = li_codeloss(alpha, self.codebook)
             loss_otsu_hm_dist, _ = otsu_codeloss(alpha, self.codebook)
 
