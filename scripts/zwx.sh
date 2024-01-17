@@ -3,7 +3,7 @@ export WANDB_MODE=offline
 gpu=0,1
 CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --weights 0 1 0 0 0 0 0.001 0 \
-    --iterations 100 \
+    --iterations 20000 \
     --lr 0.002 \
     --exp_name mean_scale_0 \
     --img_path ./data/1213_demo_data_v2/raw1 \

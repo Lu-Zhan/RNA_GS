@@ -247,8 +247,8 @@ class SimpleTrainer:
 
             # (zwx) loss for calibration
             flag = True
-            alpha = torch.sigmoid(self.rgbs)
-            loss_scale = scale_loss(self.scales[:, 0], self.scales[:, 1])
+            alpha = persist_rgbs
+            loss_scale = scale_loss(persist_scales[:, 0], persist_scales[:, 1])
             
             if self.cfg["cali_loss_type"] == "cos":
                 loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
