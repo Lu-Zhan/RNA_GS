@@ -239,81 +239,42 @@ class SimpleTrainer:
 
             times[1] += time.time() - start
 
-            # losses for reconstruction
-            loss_l1 = l1_loss(out_img, self.gt_image)
-            loss_mse = mse_loss(out_img, self.gt_image)
-            loss_masked_mse = masked_mse_loss(out_img, self.gt_image)
-            loss_masked_l1 = masked_l1_loss(out_img, self.gt_image)
-            loss_bg = bg_loss(out_img, self.gt_image)
-            loss_ssim = ssim_loss(out_img, self.gt_image)
-
             # (zwx) loss for calibration
             flag = True
             alpha = torch.sigmoid(self.rgbs)
 
-            # 2D scaling losses
-            sigma_x, sigma_y = obtain_sigma_xy(conics)
-            loss_circle = circle_loss(sigma_x, sigma_y)
-            loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
-
-            
-            if self.cfg["cali_loss_type"] == "cos":
-                loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
-            else:
-                if flag:
-                    loss_cos_dist, _ = codebook_hamming_loss(
-                        alpha, self.codebook, "normal"
-                    )
-                else:
-                    if self.cfg["cali_loss_type"] == "mean":
-                        loss_cos_dist, _ = codebook_hamming_loss(
-                            alpha, self.codebook, "mean"
-                        )
-                    elif self.cfg["cali_loss_type"] == "median":
-                        loss_cos_dist, _ = codebook_hamming_loss(
-                            alpha, self.codebook, "median"
-                        )
-                    elif self.cfg["cali_loss_type"] == "li":
-                        loss_cos_dist, _ = li_codeloss(alpha, self.codebook)
-                    elif self.cfg["cali_loss_type"] == "otsu":
-                        loss_cos_dist, _ = otsu_codeloss(alpha, self.codebook)
-                if iter == 0:
-                    formal_code_loss = abs(loss_cos_dist.item())
-                elif (
-                    iter % 200 == 0
-                    and abs(formal_code_loss - loss_cos_dist) < 0.01
-                    and flag == True
-                ):
-                    # print(f'start using {self.cfg["cali_loss_type"]} as threshold')
-                    formal_code_loss = loss_cos_dist.item()
-                    flag = False
-                elif iter % 200 == 0:
-                    formal_code_loss = loss_cos_dist.item()
-                tolerance = 2 / 15.0
-                if loss_cos_dist < tolerance:
-                    loss_cos_dist = 0
-                else:
-                    loss_cos_dist -= tolerance
-
             loss = 0
 
+            # (lz) count loss required for training
+            if self.cfg["w_circle"] > 0 or self.cfg["w_size"] > 0:
+                sigma_x, sigma_y = obtain_sigma_xy(conics)
+
             if self.cfg["w_l1"] > 0:
+                loss_l1 = l1_loss(out_img, self.gt_image)
                 loss += self.cfg["w_l1"] * loss_l1
             if self.cfg["w_l2"] > 0:
+                loss_mse = mse_loss(out_img, self.gt_image)
                 loss += self.cfg["w_l2"] * loss_mse
             if self.cfg["w_lml1"] > 0:
+                loss_masked_l1 = masked_l1_loss(out_img, self.gt_image)
                 loss += self.cfg["w_lml1"] * loss_masked_l1
             if self.cfg["w_lml2"] > 0:
+                loss_masked_mse = masked_mse_loss(out_img, self.gt_image)
                 loss += self.cfg["w_lml2"] * loss_masked_mse
             if self.cfg["w_bg"] > 0:
+                loss_bg = bg_loss(out_img, self.gt_image)
                 loss += self.cfg["w_bg"] * loss_bg
             if self.cfg["w_ssim"] > 0:
+                loss_ssim = ssim_loss(out_img, self.gt_image)
                 loss += self.cfg["w_ssim"] * loss_ssim
             if self.cfg["w_circle"] > 0:
+                loss_circle = circle_loss(sigma_x, sigma_y)
                 loss += self.cfg["w_circle"] * loss_circle
             if self.cfg["w_size"] > 0:
+                loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
                 loss += self.cfg["w_size"] * loss_size
             if self.cfg["w_code_cos"] > 0:
+                loss_cos_dist, flag = codebook_cos_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter)
                 loss += self.cfg["w_code_cos"] * loss_cos_dist
 
             optimizer.zero_grad()
@@ -377,55 +338,7 @@ class SimpleTrainer:
             times[2] += time.time() - start
             optimizer.step()
 
-            with torch.no_grad():
-                if save_imgs and iter % 100 == 0:
-                    # count psnr for each channel, out_img: [h, w, 15]
-                    psnr = []
-
-                    for i in range(15):
-                        mse = torch.mean(
-                            (out_img[..., i] - self.gt_image[..., i]) ** 2
-                        ).cpu()
-                        psnr.append(float(10 * torch.log10(1 / mse)))
-
-                    mean_mse = torch.mean((out_img - self.gt_image) ** 2).cpu()
-                    mean_psnr = float(10 * torch.log10(1 / mean_mse))
-
-                    print(
-                        f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, L: {loss:.7f}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}"
-                    )
-
-                    wandb.log(
-                        {
-                            "point_number": persist_rgbs.shape[0],
-                            "loss/total": loss,
-                            "loss/l2": loss_mse,
-                            "loss/l1": loss_l1,
-                            "loss/lml2": loss_masked_mse,
-                            "loss/lml1": loss_masked_l1,
-                            "loss/bg": loss_bg,
-                            "loss/ssim": loss_ssim,
-                            "loss/code_cos": loss_cos_dist,
-                            "loss/scale_loss": scale_loss,
-                            "psnr/mean": mean_psnr,
-                        },
-                        step=iter,
-                    )
-
-                    wandb.log(
-                        {f"psnr/image_{i}": psnr[i] for i in range(15)}, step=iter
-                    )
-
-                if save_imgs and iter % 500 == 0:
-                    view = view_output(out_img, self.gt_image)
-                    frames.append(view)
-
-                    # save last view
-                    Image.fromarray(view).save(
-                        f"{out_dir}/last.png",
-                    )
-
-                    wandb.log({"view/recon": wandb.Image(view)}, step=iter)
+            self.validation(save_imgs, loss, out_img, persist_rgbs, conics, alpha, iter, iterations, frames, out_dir)
         
         # (zwx) print code loss
         print("test_li:", li_codeloss(torch.sigmoid(self.rgbs), self.codebook)[0].item(),
@@ -486,3 +399,82 @@ class SimpleTrainer:
                 loss=self.cfg["cali_loss_type"],
             )
 
+    # (lz) separate validation function
+    @torch.no_grad()
+    def validation(self, save_imgs, loss, out_img, persist_rgbs, conics, alpha, iter, iterations, frames, out_dir):
+        if save_imgs and iter % 100 == 0:
+            # count loss for validation
+            sigma_x, sigma_y = obtain_sigma_xy(conics)
+            loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
+            loss_circle = circle_loss(sigma_x, sigma_y)
+
+            loss_l1 = l1_loss(out_img, self.gt_image)
+            loss_mse = mse_loss(out_img, self.gt_image)
+            loss_masked_l1 = masked_l1_loss(out_img, self.gt_image)
+            loss_masked_mse = masked_mse_loss(out_img, self.gt_image)
+            loss_bg = bg_loss(out_img, self.gt_image)
+            loss_ssim = ssim_loss(out_img, self.gt_image)
+
+            loss_cos_dist, _ = codebook_cos_loss("cos", alpha, self.codebook, flag=True, iter=iter)
+            loss_nml_hm_dist, _ = codebook_hamming_loss("normal", alpha, self.codebook, flag=True, iter=iter)
+            loss_mean_hm_dist, _ = codebook_hamming_loss("mean", alpha, self.codebook, flag=False, iter=iter)
+            loss_median_hm_dist, _ = codebook_hamming_loss("median", alpha, self.codebook, flag=False, iter=iter)
+            loss_li_hm_dist, _ = li_codeloss(alpha, self.codebook)
+            loss_otsu_hm_dist, _ = otsu_codeloss(alpha, self.codebook)
+
+            # count psnr for each channel, out_img: [h, w, 15]
+            psnr = []
+
+            for i in range(15):
+                mse = torch.mean(
+                    (out_img[..., i] - self.gt_image[..., i]) ** 2
+                ).cpu()
+                psnr.append(float(10 * torch.log10(1 / mse)))
+
+            mean_mse = torch.mean((out_img - self.gt_image) ** 2).cpu()
+            mean_psnr = float(10 * torch.log10(1 / mean_mse))
+
+            print(
+                f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}"
+            )
+
+            wandb.log(
+                {
+                    "point_number": persist_rgbs.shape[0],
+                    "loss/total": loss,
+                    "loss/l2": loss_mse,
+                    "loss/l1": loss_l1,
+                    "loss/lml2": loss_masked_mse,
+                    "loss/lml1": loss_masked_l1,
+                    "loss/bg": loss_bg,
+                    "loss/ssim": loss_ssim,
+                    "loss/code_cos": loss_cos_dist,
+                    "loss/loss_circle": loss_circle,
+                    "loss/size_loss": loss_size,
+                    "psnr/mean": mean_psnr,
+                    "dist/loss_nml_hm_dist": loss_nml_hm_dist,
+                    "dist/loss_mean_hm_dist": loss_mean_hm_dist,
+                    "dist/loss_median_hm_dist": loss_median_hm_dist,
+                    "dist/loss_li_hm_dist": loss_li_hm_dist,
+                    "dist/loss_otsu_hm_dist": loss_otsu_hm_dist,
+                },
+                step=iter,
+            )
+
+            wandb.log(
+                {f"psnr/image_{i}": psnr[i] for i in range(15)}, step=iter
+            )
+
+        if save_imgs and iter % 500 == 0:
+            view = view_output(out_img, self.gt_image)
+            frames.append(view)
+
+            # save last view
+            Image.fromarray(view).save(
+                f"{out_dir}/last.png",
+            )
+
+            wandb.log({"view/recon": wandb.Image(view)}, step=iter)
+
+
+        

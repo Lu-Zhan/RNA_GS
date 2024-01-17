@@ -212,6 +212,8 @@ def size_loss(sigma_x, sigma_y, min_size=6, max_size=12):
 
     return loss_x + loss_y
 
+
+# (zwx)
 def scale_loss(scale_x, scale_y):
     # sigma -> axis length, need modification
     scale_x = torch.sigmoid(scale_x)
@@ -230,3 +232,47 @@ def scale_loss(scale_x, scale_y):
     )
     scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
     return scale_loss
+
+
+def codebook_loss(type, alpha, codebook, flag, iter):
+    if type == "cos":
+        loss_cos_dist = codebook_cos_loss(alpha, codebook)
+    else:
+        if flag:
+            loss_cos_dist, _ = codebook_hamming_loss(
+                alpha, codebook, "normal"
+            )
+        else:
+            if type == "mean":
+                loss_cos_dist, _ = codebook_hamming_loss(
+                    alpha, codebook, "mean"
+                )
+            elif type == "median":
+                loss_cos_dist, _ = codebook_hamming_loss(
+                    alpha, codebook, "median"
+                )
+            elif type == "li":
+                loss_cos_dist, _ = li_codeloss(alpha, codebook)
+            elif type == "otsu":
+                loss_cos_dist, _ = otsu_codeloss(alpha, codebook)
+        if iter == 0:
+            formal_code_loss = abs(loss_cos_dist.item())
+        elif (
+            iter % 200 == 0
+            and abs(formal_code_loss - loss_cos_dist) < 0.01
+            and flag == True
+        ):
+            # print(f'start using {self.cfg["cali_loss_type"]} as threshold')
+            formal_code_loss = loss_cos_dist.item()
+            flag = False
+        elif iter % 200 == 0:
+            formal_code_loss = loss_cos_dist.item()
+
+        tolerance = 2 / 15.0
+
+        if loss_cos_dist < tolerance:
+            loss_cos_dist = 0
+        else:
+            loss_cos_dist -= tolerance
+    
+    return loss_cos_dist, flag
