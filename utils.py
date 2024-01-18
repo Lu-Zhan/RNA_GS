@@ -4,6 +4,14 @@ import torch
 import numpy as np
 import pandas as pd
 from skimage import filters
+import tyro
+
+from pathlib import Path
+from typing import Optional
+import argparse
+
+import matplotlib.pyplot as plt
+
 
 
 def read_codebook(path):
@@ -41,7 +49,13 @@ def get_index_cos(pred_code, codebook):
 
 
 #(gzx):读入的codebook_path
-def write_to_csv(pixel_coords, alpha, save_path, h, w, image,ref=None,post_processing=False,codebook_path = 'data/codebook.xlsx'):
+def write_to_csv(pixel_coords,
+                 alpha, save_path,
+                 h, w,
+                 image,ref=None,
+                 post_processing=False,
+                 pos_threshold = 0.0,
+                 codebook_path = 'data/codebook.xlsx'):
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
     rna_name = read_codebook_name(path=codebook_path)
@@ -65,7 +79,6 @@ def write_to_csv(pixel_coords, alpha, save_path, h, w, image,ref=None,post_proce
         scores = scores.data.cpu().numpy()
         
     else:
-        pos_threshold = 30.0
         ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
         # for i in range(20):
         #     print(ref_scores[i*20:i*20+20])
@@ -124,6 +137,7 @@ def write_to_csv_hamming(
     image,
     ref=None,
     post_processing=False,
+    pos_threshold = 0.0,
     codebook_path="./data/codebook.xlsx",
     loss="mean",
 ):
@@ -175,7 +189,8 @@ def write_to_csv_hamming(
             "y": py,
             "gene": np.array(pred_name),
             "index": (min_index + 1).flatten().data.cpu().numpy(),
-            "min_distance_value": min_distance_values[:, 0].cpu().numpy(),
+            # "min_distance_value": min_distance_values[:, 0].cpu().numpy(),
+            "score": (1-min_distance_values[:, 0]).cpu().numpy(),
         }
     )
 
@@ -202,7 +217,6 @@ def write_to_csv_hamming(
     #(gzx):后处理
     
     if post_processing:
-        pos_threshold = 30.0
         ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
         # for i in range(20):
         #     print(ref_scores[i*20:i*20+20])
@@ -236,7 +250,7 @@ def draw_results(image, px, py, pred_name, scores, save_path):
     # # scores = (scores - 0.95) / 0.05
     # # scores = np.clip(scores, 0, 1)
     # ax.scatter(py, px, alpha=scores, cmap=cm.jet, s=2)
-    ax.scatter(px, py, alpha=scores, cmap=cm.jet, s=2)
+    ax.scatter(px, py,color="red", alpha=scores, cmap=cm.jet, s=2)
 
     # for i, txt in enumerate(pred_name):
     #     ax.annotate(txt, (px[i], py[i]))
@@ -259,25 +273,50 @@ def count_vaild_class(score, class_index, th=0.9):
     return len(counts)
 
 
-def read_and_vis_results(csv_path):
+def read_and_vis_results(csv_path,img_path,pos_threshold=0):
     df = pd.read_csv(csv_path)
 
     px = df["x"].values
     py = df["y"].values
     pred_name = df["gene"].values
     scores = df["score"].values
+    index = df["index"].values
 
     from PIL import Image
+    
+    
+    #（gzx）：画分布图
+    #plot 1:
+
+    plt.subplot(1, 2, 1)
+    plt.hist(scores)
+    plt.title("scores")
+
 
     images = []
     for i in range(1, 16):
-        image = Image.open(f"data/1213_demo_data_v2/raw1/{i}.png").convert("RGB")
+        image = Image.open(f"{img_path}/{i}.png").convert("L")
         image = np.array(image) / 255.0
         images.append(image)
 
     image = np.stack(images, axis=2)  # (h, w, 15)
-    image = image.mean(axis=2)  # (h, w, 1)
-    image = (image - image.min()) / (image.max() - image.min())
+    # image = image.mean(axis=2)  # (h, w, 1)
+    # image = (image - image.min()) / (image.max() - image.min())
+
+    #(gzx):改用最大值而不是mean
+    gt_image = image.max(axis=2)
+    ref_scores = np.clip(gt_image[(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
+    scores = scores * ref_scores
+    image = np.tile(gt_image[..., None], [1, 1, 3])
+    
+    #plot 2:
+
+    plt.subplot(1, 2, 2)
+    plt.hist(scores)
+    plt.title("scores after postprocessing")
+    
+    plt.savefig(str(csv_path).replace(".csv","_hist.png"))
+
 
     draw_results(
         image,
@@ -285,8 +324,20 @@ def read_and_vis_results(csv_path):
         py,
         pred_name,
         scores,
-        csv_path.replace(".csv", "_vis_read_all_image.png"),
+        str(csv_path).replace(".csv", f"_post{pos_threshold}.png"),
     )
+    
+    df = pd.DataFrame(
+        {
+            "x": px,
+            "y": py,
+            "gene": pred_name,
+            "index": index,
+            "score": scores,
+        }
+    )
+
+    df.to_csv(str(csv_path).replace(".csv", f"_post{pos_threshold}.csv"), index=False)
 
     print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.7))
     print("number of vaild point (th=0.9)", count_vaild_pixel(score=scores, th=0.85))
@@ -305,6 +356,12 @@ def read_and_vis_results(csv_path):
         count_vaild_class(score=scores, class_index=pred_name, th=0.999),
     )
 
-
 if __name__ == "__main__":
-    read_and_vis_results(csv_path="outputs/codecos_0.001_vis/output.csv")
+    parser = argparse.ArgumentParser()
+    parser .add_argument("--csv_path",type=str,default=Path("outputs/debug_T/output.csv"))
+    parser .add_argument("--img_path",type=str,default=Path("../data/1213_demo_data_v2/raw1"))
+    parser .add_argument("--pos_threshold",type=float,default=20)
+    arg=parser.parse_args()
+    read_and_vis_results(csv_path=arg.csv_path,img_path=arg.img_path,pos_threshold=arg.pos_threshold)
+
+
