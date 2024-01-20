@@ -368,6 +368,7 @@ class SimpleTrainer:
                 "rgbs": self.rgbs,
                 "opacities": self.opacities,
                 "viewmat": self.viewmat,
+                "persistent_mask": self.persistent_mask,
             }, 
             os.path.join(out_dir, "params.pth")
         )
