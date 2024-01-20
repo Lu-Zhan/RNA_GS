@@ -49,13 +49,18 @@ def get_index_cos(pred_code, codebook):
 
 
 #(gzx):读入的codebook_path
-def write_to_csv(pixel_coords,
-                 alpha, save_path,
-                 h, w,
-                 image,ref=None,
-                 post_processing=False,
-                 pos_threshold = 0.0,
-                 codebook_path = 'data/codebook.xlsx'):
+def write_to_csv(
+        pixel_coords,
+        alpha, 
+        save_path,
+        h, w,
+        image,
+        ref=None,
+        post_processing=False,
+        pos_threshold=0.0,
+        codebook_path='data/codebook.xlsx'
+    ):
+
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
     rna_name = read_codebook_name(path=codebook_path)
@@ -77,13 +82,14 @@ def write_to_csv(pixel_coords,
     if post_processing == False:
         indexs = indexs.data.cpu().numpy()
         scores = scores.data.cpu().numpy()
-        
+        origin_scores = scores.copy()
     else:
-        ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
+        ref_scores = torch.clamp(ref.max(dim=2)[0][(py, px)] * 255.0 - pos_threshold, 0.0, 10.0) / 10.0
         # for i in range(20):
         #     print(ref_scores[i*20:i*20+20])
 
         scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
+        origin_scores = scores.copy()
         indexs = indexs.data.cpu().numpy()
         
         total_scores = ref_scores * scores
@@ -92,9 +98,6 @@ def write_to_csv(pixel_coords,
         
     pred_name = rna_name[indexs]  # (num_samples,)
      
-
-
-    
     df = pd.DataFrame(
         {"x": px, "y": py, "gene": pred_name, "index": indexs, "score": scores}
     )
@@ -102,29 +105,39 @@ def write_to_csv(pixel_coords,
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     df.to_csv(save_path, index=False)
 
-    print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.7))
-    print("number of vaild point (th=0.9)", count_vaild_pixel(score=scores, th=0.85))
-    print("number of vaild point (th=0.95)", count_vaild_pixel(score=scores, th=0.98))
+    print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.8))
+    print("number of vaild point (th=0.9)", count_vaild_pixel(score=scores, th=0.9))
+    print("number of vaild point (th=0.95)", count_vaild_pixel(score=scores, th=0.95))
 
     print(
         "number of vaild class (th=0.8)",
-        count_vaild_class(score=scores, class_index=indexs, th=0.7),
+        count_vaild_class(score=scores, class_index=indexs, th=0.8),
     )
     print(
         "number of vaild class (th=0.9)",
-        count_vaild_class(score=scores, class_index=indexs, th=0.85),
+        count_vaild_class(score=scores, class_index=indexs, th=0.9),
     )
     print(
         "number of vaild class (th=0.95)",
-        count_vaild_class(score=scores, class_index=indexs, th=0.98),
+        count_vaild_class(score=scores, class_index=indexs, th=0.95),
     )
 
-    image = ref.max(dim=2)[0]  
+    image = ref.max(dim=2)[0] 
     image = np.tile(image.cpu().numpy()[..., None], [1, 1, 3])
 
     draw_results(
-        image, px, py, pred_name, scores, save_path.replace(".csv", "_vis_blank.png")
+        image, px, py, pred_name, origin_scores, save_path.replace(".csv", "no_postprocess.png")
     )
+
+    if post_processing:
+        draw_results(
+            image,
+            px,
+            py,
+            pred_name,
+            scores,
+            save_path.replace(".csv", f"_post{pos_threshold}.png"),
+        )
 
 
 # (zwx)

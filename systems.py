@@ -418,12 +418,7 @@ class SimpleTrainer:
                 post_processing=self.pos_score,
                 codebook_path = self.cfg["codebook_path"],
         )
-        elif (
-            self.cfg["cali_loss_type"] == "mean"
-            or self.cfg["cali_loss_type"] == "median"
-            or self.cfg["cali_loss_type"] == "li"
-            or self.cfg["cali_loss_type"] == "otsu"
-        ):
+        elif self.cfg["cali_loss_type"] in ["mean", "median", "li", "otsu"]:
             write_to_csv_hamming(
                 image=self.gt_image[..., 0],
                 pixel_coords=xys,
