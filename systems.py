@@ -32,6 +32,7 @@ from losses import (
 
 from utils import (
     write_to_csv,
+    write_to_csv_all,
     write_to_csv_hamming,
     read_codebook,
 )
@@ -368,6 +369,7 @@ class SimpleTrainer:
                 "rgbs": self.rgbs,
                 "opacities": self.opacities,
                 "viewmat": self.viewmat,
+                "persistent_mask": self.persistent_mask,
             }, 
             os.path.join(out_dir, "params.pth")
         )
@@ -404,32 +406,42 @@ class SimpleTrainer:
         print(
             f"Per step(s):\nProject: {times[0]/iterations:.5f}, Rasterize: {times[1]/iterations:.5f}, Backward: {times[2]/iterations:.5f}"
         )
-
-        # (zwx) save csv
-        if self.cfg["cali_loss_type"] == "cos":
-            write_to_csv(
-                image=self.gt_image[..., 0],
-                pixel_coords=xys,
-                alpha=persist_rgbs,
-                save_path=f"{out_dir}/output.csv",
-                h=self.H,
-                w=self.W,
-                ref=self.gt_image,
-                post_processing=self.pos_score,
-                codebook_path = self.cfg["codebook_path"],
+        # cyy ：增加写所有距离
+        write_to_csv_all(
+            image=self.gt_image[..., 0],
+            pixel_coords=xys,
+            alpha=persist_rgbs,
+            save_path=f"{out_dir}/output_all.csv",
+            h=self.H,
+            w=self.W,
+            ref=self.gt_image,
+            codebook_path = self.cfg["codebook_path"],
         )
-        elif self.cfg["cali_loss_type"] in ["mean", "median", "li", "otsu"]:
-            write_to_csv_hamming(
-                image=self.gt_image[..., 0],
-                pixel_coords=xys,
-                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
-                save_path=f"{out_dir}/output.csv",
-                h=self.H,
-                w=self.W,
-                ref=self.gt_image,
-                post_processing=self.pos_score,
-                loss=self.cfg["cali_loss_type"],
-            )
+        # (zwx) save csv
+        # if self.cfg["cali_loss_type"] == "cos":
+        #     write_to_csv(
+        #         image=self.gt_image[..., 0],
+        #         pixel_coords=xys,
+        #         alpha=persist_rgbs,
+        #         save_path=f"{out_dir}/output.csv",
+        #         h=self.H,
+        #         w=self.W,
+        #         ref=self.gt_image,
+        #         post_processing=self.pos_score,
+        #         codebook_path = self.cfg["codebook_path"],
+        # )
+        # elif self.cfg["cali_loss_type"] in ["mean", "median", "li", "otsu"]:
+            # write_to_csv_hamming(
+            #     image=self.gt_image[..., 0],
+            #     pixel_coords=xys,
+            #     alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
+            #     save_path=f"{out_dir}/output.csv",
+            #     h=self.H,
+            #     w=self.W,
+            #     ref=self.gt_image,
+            #     post_processing=self.pos_score,
+            #     loss=self.cfg["cali_loss_type"],
+            # )
 
     # (lz) separate validation function
     @torch.no_grad()
