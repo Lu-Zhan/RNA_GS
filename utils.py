@@ -54,7 +54,7 @@ def write_to_csv(pixel_coords,
                  h, w,
                  image,ref=None,
                  post_processing=False,
-                 pos_threshold = 0.0,
+                 pos_threshold = 20.0,
                  codebook_path = 'data/codebook.xlsx'):
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
@@ -73,7 +73,7 @@ def write_to_csv(pixel_coords,
     py = np.clip(py, 0, h - 1)
     
     #(gzx):后处理
-    
+    print(pos_threshold)
     if post_processing == False:
         indexs = indexs.data.cpu().numpy()
         scores = scores.data.cpu().numpy()
@@ -273,7 +273,7 @@ def count_vaild_class(score, class_index, th=0.9):
     return len(counts)
 
 
-def read_and_vis_results(csv_path,img_path,pos_threshold=0):
+def read_and_vis_results(csv_path,img_path,pos_threshold=20):
     df = pd.read_csv(csv_path)
 
     px = df["x"].values
@@ -359,9 +359,8 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=0):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser .add_argument("--csv_path",type=str,default=Path("outputs/debug_T/output.csv"))
-    parser .add_argument("--img_path",type=str,default=Path("../data/1213_demo_data_v2/raw1"))
+    parser .add_argument("--img_path",type=str,default=Path("./data/1213_demo_data_v2/raw1"))
     parser .add_argument("--pos_threshold",type=float,default=20)
     arg=parser.parse_args()
     read_and_vis_results(csv_path=arg.csv_path,img_path=arg.img_path,pos_threshold=arg.pos_threshold)
-
 

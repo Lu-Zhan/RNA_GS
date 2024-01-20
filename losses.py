@@ -204,9 +204,10 @@ def circle_loss(sigma_x, sigma_y):
 
 
 # (lz) size loss for 2D gaussian kernal
-def size_loss(sigma_x, sigma_y, min_size=6, max_size=12):
+def size_loss(sigma_x, sigma_y, min_size=9.7, max_size=10.7):
     # sigma_x or sigma_y should be in a certain range of [6, 12]
-
+    # print(sigma_x)
+    # print(sigma_y)
     loss_x = torch.relu(min_size - sigma_x).mean() + torch.relu(sigma_x - max_size).mean()
     loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(sigma_y - max_size).mean()
 
