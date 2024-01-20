@@ -1,6 +1,7 @@
 import torch
 import tyro
 import wandb
+import os
 
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,8 @@ def main(
     cali_loss_type: str = "cos",
     initialization: bool = False,
     pos_score: int = 1,
+    eval:bool = False,
+    model_path:str = "RNA_GS/outputs/debug/params.pth",
     weights: list[float] = [
         0,
         1,
@@ -90,12 +93,15 @@ def main(
         image_file_name=img_path,
         densification_interval=densification_interval,
     )
-
-    trainer.train(
-        iterations=iterations,
-        lr=lr,
-        save_imgs=save_imgs,
-    )
+    if eval:
+        os.environ['WANDB_MODE'] = 'offline'
+        trainer.test(model_path=model_path)        
+    else:
+        trainer.train(
+            iterations=iterations,
+            lr=lr,
+            save_imgs=save_imgs,
+        )
 
 
 if __name__ == "__main__":

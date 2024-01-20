@@ -89,11 +89,14 @@ def write_to_csv(
         #     print(ref_scores[i*20:i*20+20])
 
         scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
+        scores = scores.data.cpu().numpy()
+        ref_scores = ref_scores.data.cpu().numpy()
         origin_scores = scores.copy()
         indexs = indexs.data.cpu().numpy()
         
         total_scores = ref_scores * scores
-        scores = total_scores.data.cpu().numpy() 
+        scores = total_scores
+        # scores = total_scores.data.cpu().numpy() 
 
         
     pred_name = rna_name[indexs]  # (num_samples,)

@@ -508,5 +508,90 @@ class SimpleTrainer:
 
             wandb.log({"view/recon": wandb.Image(view)}, step=iter)
 
+   # (gzx)
+    def test(self,model_path):
+        model = torch.load(model_path,map_location=torch.device(self.device))
+        
+        self.means = model["means"]
+        self.rgbs = model["rgbs"]
+        self.persistent_mask = model["persistent_mask"]
+        self.scales = model["scales"]
+        self.quats = model["quats"]
+        self.opacities = model["opacities"]
+        self.viewmat = model["viewmat"]
+        
+        persist_means  = self.means [self.persistent_mask]
+        persist_scales = self.scales[self.persistent_mask]
+        persist_quats  = self.quats [self.persistent_mask]
+        persist_rgbs   = self.rgbs  [self.persistent_mask]
 
+
+        start = time.time()
+        xys, depths, radii, conics, num_tiles_hit, cov3d = project_gaussians(
+            persist_means,
+            persist_scales,
+            1,
+            persist_quats,
+            self.viewmat,
+            self.viewmat,
+            self.focal,
+            self.focal,
+            self.W / 2,
+            self.H / 2,
+            self.H,
+            self.W,
+            self.tile_bounds,
+        )
+        torch.cuda.synchronize()
+        start = time.time()
+        out_img = rasterize_gaussians(
+            xys,
+            depths,
+            radii,
+            conics,
+            num_tiles_hit,
+            torch.sigmoid(persist_rgbs),
+            torch.sigmoid(self.opacities),
+            self.H,
+            self.W,
+        )
+        torch.cuda.synchronize()
+        view = view_output(out_img, self.gt_image)
+        
+        Image.fromarray(view).save(
+            model_path.replace('.pth','_out.png'),
+        )        
+        
+        if self.cfg["cali_loss_type"] == "cos":
+            write_to_csv(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=persist_rgbs,
+                save_path=model_path.replace('.pth','_out.csv'),
+                h=self.H,
+                w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
+                pos_threshold=20,
+                codebook_path = self.cfg["codebook_path"],
+        )
+        elif (
+            self.cfg["cali_loss_type"] == "mean"
+            or self.cfg["cali_loss_type"] == "median"
+            or self.cfg["cali_loss_type"] == "li"
+            or self.cfg["cali_loss_type"] == "otsu"
+        ):
+            write_to_csv_hamming(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
+                save_path=model_path.replace('.pth','_out.csv'),
+                h=self.H,
+                w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
+                pos_threshold=20,
+                loss=self.cfg["cali_loss_type"],
+            )
+        
         
