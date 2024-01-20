@@ -126,7 +126,7 @@ def write_to_csv(
     image = np.tile(image.cpu().numpy()[..., None], [1, 1, 3])
 
     draw_results(
-        image, px, py, pred_name, origin_scores, save_path.replace(".csv", "no_postprocess.png")
+        image, px, py, pred_name, origin_scores, save_path.replace(".csv", "_no_postprocess.png")
     )
 
     if post_processing:

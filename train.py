@@ -20,7 +20,7 @@ def main(
     exp_name: str = "debug",
     cali_loss_type: str = "cos",
     initialization: bool = False,
-    pos_score: bool = False,
+    pos_score: int = 1,
     weights: list[float] = [
         0,
         1,
