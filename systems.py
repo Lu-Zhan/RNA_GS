@@ -359,6 +359,20 @@ class SimpleTrainer:
                 out_dir=out_dir,
             )
         
+        # (lz) save all parameters into one pth file
+        torch.save(
+            {
+                "means": self.means,
+                "scales": self.scales,
+                "quats": self.quats,
+                "rgbs": self.rgbs,
+                "opacities": self.opacities,
+                "viewmat": self.viewmat,
+            }, 
+            os.path.join(out_dir, "params.pth")
+        )
+
+        
         # (zwx) print code loss
         print("test_li:", li_codeloss(torch.sigmoid(persist_rgbs), self.codebook)[0].item(),
               "test_otsu:", otsu_codeloss(torch.sigmoid(persist_rgbs), self.codebook)[0].item(),
