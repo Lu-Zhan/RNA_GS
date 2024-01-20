@@ -38,13 +38,15 @@ def main(
         0.1,
         0.04,
         0.04,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
+    ],  # prune, grad, gauss th
     dens_flags: list[int] = [
         False,
         False,
         False
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos
+    ], # prune, split, clone
+    size_range : list[int] = [6, 12],
 ) -> None:
+    
     config = {
         "w_l1": weights[0],
         "w_l2": weights[1],
@@ -52,7 +54,7 @@ def main(
         "w_lml2": weights[3],
         "w_bg": weights[4],
         "w_ssim": weights[5],
-        "w_code_cos": weights[6],
+        "w_code": weights[6],
         "w_circle": weights[7],
         "w_size": weights[8],
         "prune_threshold" : thresholds[0],
@@ -67,28 +69,20 @@ def main(
         "primary_samples": primary_samples,
         "backup_samples": backup_samples,
         "densification_interval": densification_interval,
-        "initialization":initialization,
-        "pos_score":pos_score
+        "initialization": initialization,
+        "pos_score": pos_score,
+        "size_range": size_range,
     }
 
     wandb.init(
-        project="rna_cali",
+        project="rna_cali_0120",
         config=config,
         name=config["exp_name"],
     )
 
     print(f"Running with config: {config}")
 
-    if img_path:
-        # gt_image = image_path_to_tensor(img_path)
-        gt_image = images_to_tensor(img_path)
-        # print(gt_image)
-
-    else:
-        gt_image = torch.ones((height, width, 3)) * 1.0
-        # make top left and bottom right red, blue
-        gt_image[: height // 2, : width // 2, :] = torch.tensor([1.0, 0.0, 0.0])
-        gt_image[height // 2 :, width // 2 :, :] = torch.tensor([0.0, 0.0, 1.0])
+    gt_image = images_to_tensor(img_path)
 
     trainer = SimpleTrainer(
         gt_image=gt_image,
@@ -98,6 +92,7 @@ def main(
         image_file_name=img_path,
         densification_interval=densification_interval,
     )
+
     trainer.train(
         iterations=iterations,
         lr=lr,

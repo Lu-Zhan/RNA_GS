@@ -279,11 +279,11 @@ class SimpleTrainer:
                 loss_circle = circle_loss(sigma_x, sigma_y)
                 loss += self.cfg["w_circle"] * loss_circle
             if self.cfg["w_size"] > 0:
-                loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
+                loss_size = size_loss(sigma_x, sigma_y, min_size=self.cfg["size_range"][0], max_size=self.cfg["size_range"][1])
                 loss += self.cfg["w_size"] * loss_size
-            if self.cfg["w_code_cos"] > 0:
+            if self.cfg["w_code"] > 0:
                 loss_cos_dist, flag, formal_code_loss = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter,formal_code_loss)
-                loss += self.cfg["w_code_cos"] * loss_cos_dist
+                loss += self.cfg["w_code"] * loss_cos_dist
 
             optimizer.zero_grad()
             start = time.time()
@@ -471,15 +471,15 @@ class SimpleTrainer:
                     "loss/lml1": loss_masked_l1,
                     "loss/bg": loss_bg,
                     "loss/ssim": loss_ssim,
-                    "loss/code_cos": loss_cos_dist,
-                    "loss/loss_circle": loss_circle,
+                    "loss/circle_loss": loss_circle,
                     "loss/size_loss": loss_size,
                     "psnr/mean": mean_psnr,
-                    "dist/loss_nml_hm_dist": loss_nml_hm_dist,
-                    "dist/loss_mean_hm_dist": loss_mean_hm_dist,
-                    "dist/loss_median_hm_dist": loss_median_hm_dist,
-                    "dist/loss_li_hm_dist": loss_li_hm_dist,
-                    "dist/loss_otsu_hm_dist": loss_otsu_hm_dist,
+                    "dist/code_cos_loss": loss_cos_dist,
+                    "dist/hm_nml_loss": loss_nml_hm_dist,
+                    "dist/hm_mean_loss": loss_mean_hm_dist,
+                    "dist/hm_median_loss": loss_median_hm_dist,
+                    "dist/hm_li_loss": loss_li_hm_dist,
+                    "dist/hm_otsu_loss": loss_otsu_hm_dist,
                 },
                 step=iter,
             )
