@@ -4,3 +4,4 @@ wandb/
 *.pyc
 data/
 __pycache__
+*.out

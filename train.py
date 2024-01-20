@@ -9,8 +9,6 @@ from systems import SimpleTrainer
 from preprocess import images_to_tensor
 
 def main(
-    height: int = 256,
-    width: int = 256,
     primary_samples: int = 8000,
     backup_samples: int = 8000,
     save_imgs: bool = True,
