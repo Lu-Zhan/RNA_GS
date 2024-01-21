@@ -278,3 +278,10 @@ def codebook_loss(type, alpha, codebook, flag, iter,formal_code_loss = 0):
             loss_cos_dist -= tolerance
     
     return loss_cos_dist, flag, formal_code_loss
+
+# (zwx) MSE after maximum density projection
+def mdp_loss(img, gt_img):
+    MDP_img = img.max(axis = 2).values
+    MDP_gt_img = gt_img.max(axis = 2).values
+    mdp_mse = mse_loss(MDP_img, MDP_gt_img)
+    return mdp_mse

@@ -28,12 +28,14 @@ from losses import (
     obtain_sigma_xy,
     size_loss,
     circle_loss,
+    mdp_loss,
 )
 
 from utils import (
     write_to_csv,
     write_to_csv_hamming,
     read_codebook,
+    MDP_recon_psnr,
 )
 
 from preprocess import preprocess_data, give_required_data
@@ -256,7 +258,9 @@ class SimpleTrainer:
             # (lz) count loss required for training
             if self.cfg["w_circle"] > 0 or self.cfg["w_size"] > 0:
                 sigma_x, sigma_y = obtain_sigma_xy(conics)
-
+            if self.cfg["w_mdp"] > 0: # (zwx) 
+                loss_mdp = mdp_loss(out_img, self.gt_image)
+                loss += self.cfg["w_mdp"] * loss_mdp
             if self.cfg["w_l1"] > 0:
                 loss_l1 = l1_loss(out_img, self.gt_image)
                 loss += self.cfg["w_l1"] * loss_l1
@@ -454,6 +458,8 @@ class SimpleTrainer:
             loss_li_hm_dist, _ = li_codeloss(alpha, self.codebook)
             loss_otsu_hm_dist, _ = otsu_codeloss(alpha, self.codebook)
 
+            loss_mdp = mdp_loss(out_img, self.gt_image)
+
             # count psnr for each channel, out_img: [h, w, 15]
             psnr = []
 
@@ -465,9 +471,10 @@ class SimpleTrainer:
 
             mean_mse = torch.mean((out_img - self.gt_image) ** 2).cpu()
             mean_psnr = float(10 * torch.log10(1 / mean_mse))
-
+            # (zwx) mpd_psnr
+            mdp_psnr = MDP_recon_psnr(out_img, self.gt_image)
             print(
-                f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}"
+                f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}, mdpPSNR: {mdp_psnr:.2f}"
             )
 
             wandb.log(
@@ -483,12 +490,14 @@ class SimpleTrainer:
                     "loss/circle_loss": loss_circle,
                     "loss/size_loss": loss_size,
                     "psnr/mean": mean_psnr,
+                    "MDPpsnr": mdp_psnr,
                     "dist/code_cos_loss": loss_cos_dist,
                     "dist/hm_nml_loss": loss_nml_hm_dist,
                     "dist/hm_mean_loss": loss_mean_hm_dist,
                     "dist/hm_median_loss": loss_median_hm_dist,
                     "dist/hm_li_loss": loss_li_hm_dist,
                     "dist/hm_otsu_loss": loss_otsu_hm_dist,
+                    "loss/mdp_loss": loss_mdp,
                 },
                 step=iter,
             )

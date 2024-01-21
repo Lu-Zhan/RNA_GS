@@ -31,7 +31,8 @@ def main(
         0.001,
         0.1,
         0,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size
+        0,
+    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, mdp(maximum density projection)
     thresholds: list[float] = [
         0.1,
         0.04,
@@ -55,6 +56,7 @@ def main(
         "w_code": weights[6],
         "w_circle": weights[7],
         "w_size": weights[8],
+        "w_mdp": weights[9],
         "prune_threshold" : thresholds[0],
         "grad_threshold" : thresholds[1],
         "gauss_threshold" : thresholds[2],

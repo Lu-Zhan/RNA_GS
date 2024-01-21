@@ -351,6 +351,8 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=20):
     )
 
     df.to_csv(str(csv_path).replace(".csv", f"_post{pos_threshold}.csv"), index=False)
+    count_above_threshold = np.sum(scores > 0.5)
+    print(f"大于0.5的数量: {count_above_threshold}")
 
     print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.7))
     print("number of vaild point (th=0.9)", count_vaild_pixel(score=scores, th=0.85))
@@ -368,6 +370,15 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=20):
         "number of vaild class (th=0.99)",
         count_vaild_class(score=scores, class_index=pred_name, th=0.999),
     )
+
+# (zwx) PSNR after maximum density projection
+def MDP_recon_psnr(img, gt_img):
+    MDP_img = img.max(axis = 2).values
+    MDP_gt_img = gt_img.max(axis = 2).values
+    mse_loss = torch.nn.MSELoss()
+    mse = mse_loss(MDP_img, MDP_gt_img)
+    MDP_PSNR =  float(10 * torch.log10(1 / mse))
+    return MDP_PSNR
 
 if __name__ == "__main__":
     pass
