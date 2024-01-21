@@ -26,13 +26,16 @@ from losses import (
     otsu_codeloss,
     codebook_hamming_loss,
     obtain_sigma_xy,
+    obtain_sigma_xy_rho,
     size_loss,
     circle_loss,
+    rho_loss,
     mdp_loss,
 )
 
 from utils import (
     write_to_csv,
+    write_to_csv_all,
     write_to_csv_hamming,
     read_codebook,
     MDP_recon_psnr,
@@ -288,6 +291,10 @@ class SimpleTrainer:
             if self.cfg["w_code"] > 0:
                 loss_cos_dist, flag, formal_code_loss = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter,formal_code_loss)
                 loss += self.cfg["w_code"] * loss_cos_dist
+            if self.cfg["w_rho"] > 0:
+                sigma_x, sigma_y, rho = obtain_sigma_xy_rho(conics)
+                loss_rho = rho_loss(sigma_x, sigma_y, rho)
+                loss += self.cfg["w_rho"] * loss_rho
 
             optimizer.zero_grad()
             start = time.time()
@@ -363,7 +370,7 @@ class SimpleTrainer:
                 out_dir=out_dir,
             )
         
-        # (lz) save all parameters into one pth file
+        # cyy: add what project need
         torch.save(
             {
                 "means": self.means,
@@ -372,6 +379,11 @@ class SimpleTrainer:
                 "rgbs": self.rgbs,
                 "opacities": self.opacities,
                 "viewmat": self.viewmat,
+                "persistent_mask": self.persistent_mask,
+                "focal": self.focal,
+                "H": self.H,
+                "W": self.W,
+                "tile_bounds": self.tile_bounds,
             }, 
             os.path.join(out_dir, "params.pth")
         )
@@ -408,41 +420,54 @@ class SimpleTrainer:
         print(
             f"Per step(s):\nProject: {times[0]/iterations:.5f}, Rasterize: {times[1]/iterations:.5f}, Backward: {times[2]/iterations:.5f}"
         )
-
-        # (zwx) save csv
-        if self.cfg["cali_loss_type"] == "cos":
-            write_to_csv(
-                image=self.gt_image[..., 0],
-                pixel_coords=xys,
-                alpha=persist_rgbs,
-                save_path=f"{out_dir}/output.csv",
-                h=self.H,
-                w=self.W,
-                ref=self.gt_image,
-                post_processing=self.pos_score,
-                codebook_path = self.cfg["codebook_path"],
+        # cyy ：增加训练结束时写所有距离
+        write_to_csv_all(
+            pixel_coords=xys,
+            sigma=conics,
+            alpha=alpha,
+            save_path=f"{out_dir}/output_all.csv",
+            h=self.H,
+            w=self.W,
+            ref=self.gt_image,
+            codebook_path = self.cfg["codebook_path"],
         )
-        elif self.cfg["cali_loss_type"] in ["mean", "median", "li", "otsu"]:
-            write_to_csv_hamming(
-                image=self.gt_image[..., 0],
-                pixel_coords=xys,
-                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
-                save_path=f"{out_dir}/output.csv",
-                h=self.H,
-                w=self.W,
-                ref=self.gt_image,
-                post_processing=self.pos_score,
-                loss=self.cfg["cali_loss_type"],
-            )
+        # (zwx) save csv
+        # if self.cfg["cali_loss_type"] == "cos":
+        #     write_to_csv(
+        #         image=self.gt_image[..., 0],
+        #         pixel_coords=xys,
+        #         alpha=persist_rgbs,
+        #         save_path=f"{out_dir}/output.csv",
+        #         h=self.H,
+        #         w=self.W,
+        #         ref=self.gt_image,
+        #         post_processing=self.pos_score,
+        #         codebook_path = self.cfg["codebook_path"],
+        # )
+        # elif self.cfg["cali_loss_type"] in ["mean", "median", "li", "otsu"]:
+            # write_to_csv_hamming(
+            #     image=self.gt_image[..., 0],
+            #     pixel_coords=xys,
+            #     alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
+            #     save_path=f"{out_dir}/output.csv",
+            #     h=self.H,
+            #     w=self.W,
+            #     ref=self.gt_image,
+            #     post_processing=self.pos_score,
+            #     loss=self.cfg["cali_loss_type"],
+            # )
 
     # (lz) separate validation function
     @torch.no_grad()
     def validation(self, save_imgs, loss, out_img, persist_rgbs, conics, alpha, iter, iterations, frames, out_dir):
         if save_imgs and iter % 100 == 0:
             # count loss for validation
-            sigma_x, sigma_y = obtain_sigma_xy(conics)
+            # sigma_x, sigma_y = obtain_sigma_xy(conics)
+            sigma_x, sigma_y, rho = obtain_sigma_xy_rho(conics)
+
             loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
             loss_circle = circle_loss(sigma_x, sigma_y)
+            loss_rho = rho_loss(sigma_x, sigma_y, rho)
 
             loss_l1 = l1_loss(out_img, self.gt_image)
             loss_mse = mse_loss(out_img, self.gt_image)
@@ -489,6 +514,7 @@ class SimpleTrainer:
                     "loss/ssim": loss_ssim,
                     "loss/circle_loss": loss_circle,
                     "loss/size_loss": loss_size,
+                    "loss/rho_loss": loss_rho,
                     "psnr/mean": mean_psnr,
                     "MDPpsnr": mdp_psnr,
                     "dist/code_cos_loss": loss_cos_dist,
@@ -517,5 +543,90 @@ class SimpleTrainer:
 
             wandb.log({"view/recon": wandb.Image(view)}, step=iter)
 
+   # (gzx)
+    def test(self,model_path):
+        model = torch.load(model_path,map_location=torch.device(self.device))
+        
+        self.means = model["means"]
+        self.rgbs = model["rgbs"]
+        self.persistent_mask = model["persistent_mask"]
+        self.scales = model["scales"]
+        self.quats = model["quats"]
+        self.opacities = model["opacities"]
+        self.viewmat = model["viewmat"]
+        
+        persist_means  = self.means [self.persistent_mask]
+        persist_scales = self.scales[self.persistent_mask]
+        persist_quats  = self.quats [self.persistent_mask]
+        persist_rgbs   = self.rgbs  [self.persistent_mask]
 
+
+        start = time.time()
+        xys, depths, radii, conics, num_tiles_hit, cov3d = project_gaussians(
+            persist_means,
+            persist_scales,
+            1,
+            persist_quats,
+            self.viewmat,
+            self.viewmat,
+            self.focal,
+            self.focal,
+            self.W / 2,
+            self.H / 2,
+            self.H,
+            self.W,
+            self.tile_bounds,
+        )
+        torch.cuda.synchronize()
+        start = time.time()
+        out_img = rasterize_gaussians(
+            xys,
+            depths,
+            radii,
+            conics,
+            num_tiles_hit,
+            torch.sigmoid(persist_rgbs),
+            torch.sigmoid(self.opacities),
+            self.H,
+            self.W,
+        )
+        torch.cuda.synchronize()
+        view = view_output(out_img, self.gt_image)
+        
+        Image.fromarray(view).save(
+            model_path.replace('.pth','_out.png'),
+        )        
+        
+        if self.cfg["cali_loss_type"] == "cos":
+            write_to_csv(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=persist_rgbs,
+                save_path=model_path.replace('.pth','_out.csv'),
+                h=self.H,
+                w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
+                pos_threshold=20,
+                codebook_path = self.cfg["codebook_path"],
+        )
+        elif (
+            self.cfg["cali_loss_type"] == "mean"
+            or self.cfg["cali_loss_type"] == "median"
+            or self.cfg["cali_loss_type"] == "li"
+            or self.cfg["cali_loss_type"] == "otsu"
+        ):
+            write_to_csv_hamming(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
+                save_path=model_path.replace('.pth','_out.csv'),
+                h=self.H,
+                w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
+                pos_threshold=20,
+                loss=self.cfg["cali_loss_type"],
+            )
+        
         

@@ -1,6 +1,7 @@
 import torch
 import tyro
 import wandb
+import os
 
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,8 @@ def main(
     cali_loss_type: str = "cos",
     initialization: bool = False,
     pos_score: int = 1,
+    eval:bool = False,
+    model_path:str = "RNA_GS/outputs/debug/params.pth",
     weights: list[float] = [
         0,
         1,
@@ -32,7 +35,7 @@ def main(
         0.1,
         0,
         0,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, mdp(maximum density projection)
+    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, rho, mdp(maximum density projection)
     thresholds: list[float] = [
         0.1,
         0.04,
@@ -56,7 +59,8 @@ def main(
         "w_code": weights[6],
         "w_circle": weights[7],
         "w_size": weights[8],
-        "w_mdp": weights[9],
+        "w_rho": weights[9],
+        "w_mdp": weights[10],
         "prune_threshold" : thresholds[0],
         "grad_threshold" : thresholds[1],
         "gauss_threshold" : thresholds[2],
@@ -92,12 +96,15 @@ def main(
         image_file_name=img_path,
         densification_interval=densification_interval,
     )
-
-    trainer.train(
-        iterations=iterations,
-        lr=lr,
-        save_imgs=save_imgs,
-    )
+    if eval:
+        os.environ['WANDB_MODE'] = 'offline'
+        trainer.test(model_path=model_path)        
+    else:
+        trainer.train(
+            iterations=iterations,
+            lr=lr,
+            save_imgs=save_imgs,
+        )
 
 
 if __name__ == "__main__":

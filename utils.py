@@ -11,7 +11,10 @@ from typing import Optional
 import argparse
 
 import matplotlib.pyplot as plt
-
+from losses import obtain_sigma_xy
+from gsplat.project_gaussians import project_gaussians
+from gsplat.rasterize import rasterize_gaussians
+from preprocess import images_to_tensor
 
 
 def read_codebook(path):
@@ -89,11 +92,14 @@ def write_to_csv(
         #     print(ref_scores[i*20:i*20+20])
 
         scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
+        scores = scores.data.cpu().numpy()
+        ref_scores = ref_scores.data.cpu().numpy()
         origin_scores = scores.copy()
         indexs = indexs.data.cpu().numpy()
         
         total_scores = ref_scores * scores
-        scores = total_scores.data.cpu().numpy() 
+        scores = total_scores
+        # scores = total_scores.data.cpu().numpy() 
 
         
     pred_name = rna_name[indexs]  # (num_samples,)
@@ -138,6 +144,141 @@ def write_to_csv(
             scores,
             save_path.replace(".csv", f"_post{pos_threshold}.png"),
         )
+
+# cyy: 增加从ckpt读取并输出csv
+# usage: load_ckpt_write_to_csv(ckpt_path='outputs/ablation_baseline',img_path=Path("data/1213_demo_data_v2/raw1"),codebook_path=Path("data/codebook.xlsx"))
+def load_ckpt_write_to_csv(ckpt_path,img_path,codebook_path):
+    params_file = os.path.join(ckpt_path, "params.pth")
+    loaded_params = torch.load(params_file)
+    means = loaded_params["means"]
+    scales = loaded_params["scales"]
+    quats = loaded_params["quats"]
+    rgbs = loaded_params["rgbs"]
+    opacities = loaded_params["opacities"]
+    viewmat = loaded_params["viewmat"]
+    persistent_mask = loaded_params["persistent_mask"]
+    focal = loaded_params["focal"]
+    H = loaded_params["H"]
+    W = loaded_params["W"]
+    tile_bounds = loaded_params["tile_bounds"]
+    persist_means  = means [persistent_mask]
+    persist_scales = scales[persistent_mask]
+    persist_quats  = quats [persistent_mask]
+    persist_rgbs   = rgbs  [persistent_mask]
+    xys, depths, radii, conics, num_tiles_hit, cov3d = project_gaussians(
+                persist_means,
+                persist_scales,
+                1,
+                persist_quats,
+                viewmat,
+                viewmat,
+                focal,
+                focal,
+                W / 2,
+                H / 2,
+                H,
+                W,
+                tile_bounds,
+            )
+    alpha = torch.sigmoid(persist_rgbs)
+    gt_image = images_to_tensor(img_path)
+    write_to_csv_all(
+            pixel_coords=xys,
+            sigma=conics,
+            alpha=alpha,
+            save_path=f"{ckpt_path}/output_all_ckpt.csv",
+            h=H,
+            w=W,
+            ref=gt_image,
+            codebook_path = codebook_path,
+        )
+
+
+# cyy: 增加输出ppt格式的csv
+def write_to_csv_all(
+    pixel_coords,
+    alpha,
+    sigma,
+    save_path,
+    h,
+    w,
+    ref=None,
+    pos_threshold = 20.0,
+    codebook_path="./data/codebook.xlsx",
+):
+    codebook = read_codebook(path=codebook_path)
+    codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
+    expanded_codebook = codebook.unsqueeze(0)
+    rna_name = read_codebook_name(path=codebook_path)
+    sigma_x, sigma_y = obtain_sigma_xy(sigma)
+    # losses=['cos','mean','median','li']
+    losses=['cos']
+    for loss in losses:
+        if loss=="cos":
+            pred_code = alpha
+            min_distance_values, min_index = get_index_cos(pred_code, codebook)  # (num_samples,)
+        if loss == "mean":
+            sorted_ranks, _ = torch.sort(alpha, dim=0)
+            # 计算每列前70%的阈值
+            threshold = sorted_ranks[int(0.7 * alpha.size(0))]
+            pred_code_bin = torch.where(alpha > threshold, torch.tensor(1), torch.tensor(0))
+        if loss == "median":
+            threshold = torch.median(alpha)
+            pred_code_bin = torch.where(alpha > threshold, torch.tensor(1), torch.tensor(0))
+        if loss == "li":
+            pred_code_bin = torch.zeros_like(alpha)
+            for i in range(alpha.shape[1]):
+                # 取出同一张图片的alpha
+                image = alpha[:, i]
+                image_np = np.asarray(image.detach().cpu())
+                best_threshold = filters.threshold_li(image_np)
+                # 与阈值进行比较
+                binary_image = image > best_threshold
+                pred_code_bin[:, i] = binary_image
+        if loss!="cos":
+            expanded_pred_code = pred_code_bin.unsqueeze(1)
+            hamming_distance = (expanded_pred_code != expanded_codebook).sum(
+                dim=2
+            ).float() / codebook.shape[1]
+            # min_index = torch.argmin(hamming_distance, dim=1, keepdim=True)
+            min_distance_values, min_index = torch.min(hamming_distance, dim=1, keepdim=True)
+        px = pixel_coords.data.cpu().numpy()[:, 0]
+        py = pixel_coords.data.cpu().numpy()[:, 1]
+        px = px.astype(np.int16)
+        py = py.astype(np.int16)
+        px = np.clip(px, 0, w - 1)
+        py = np.clip(py, 0, h - 1)
+        if loss=="cos":
+            pred_name = [
+                rna_name[int(min_index[x].item())].replace("'", "")
+                for x in range(min_index.shape[0])
+            ]
+            df = pd.DataFrame(
+                {
+                    "x": px,
+                    "y": py,
+                    "Class index": (min_index + 1).flatten().data.cpu().numpy(),
+                    "Class name": np.array(pred_name),
+                    # "cos_score": (min_distance_values).detach().cpu().numpy(),
+                }
+            )
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
+            min_distance_values = (ref_scores.cpu()) * (min_distance_values.cpu())
+            df['cos_simi']=min_distance_values.detach().cpu().numpy()
+            df['Sigma_x']=sigma_x.detach().cpu().numpy()
+            df['Sigma_y']=sigma_y.detach().cpu().numpy()
+            compressed_alpha = [' '.join([str(element) for element in row.tolist()]) for row in alpha]
+            df['15D value']=compressed_alpha
+        else:
+            min_distance_values=min_distance_values.flatten()
+            df[f'hm_{loss}_score']=(1-min_distance_values).cpu().numpy()
+            hm_score = 1 - min_distance_values
+            ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
+            hm_score = ref_scores * hm_score
+            df[f'hm_{loss}_score_post']=(hm_score).cpu().numpy()
+        
+    df.to_csv(save_path, index=True)
 
 
 # (zwx)
@@ -209,25 +350,6 @@ def write_to_csv_hamming(
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     df.to_csv(save_path, index=False)
-
-    # print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.7))
-    # print("number of vaild point (th=0.9)", count_vaild_pixel(score=scores, th=0.85))
-    # print("number of vaild point (th=0.95)", count_vaild_pixel(score=scores, th=0.98))
-
-    # print(
-    #     "number of vaild class (th=0.8)",
-    #     count_vaild_class(score=scores, class_index=indexs, th=0.7),
-    # )
-    # print(
-    #     "number of vaild class (th=0.9)",
-    #     count_vaild_class(score=scores, class_index=indexs, th=0.85),
-    # )
-    # print(
-    #     "number of vaild class (th=0.95)",
-    #     count_vaild_class(score=scores, class_index=indexs, th=0.98),
-    # )
-    
-    #(gzx):后处理
     
     if post_processing:
         ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
@@ -381,5 +503,5 @@ def MDP_recon_psnr(img, gt_img):
     return MDP_PSNR
 
 if __name__ == "__main__":
-    pass
+    load_ckpt_write_to_csv(ckpt_path='outputs/ablation_baseline',img_path=Path("data/1213_demo_data_v2/raw1"),codebook_path=Path("data/codebook.xlsx"))
 

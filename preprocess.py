@@ -86,10 +86,8 @@ def images_to_tensor(image_path: Path):
     for image_path in image_paths:
         img = Image.open(image_path)
         transform = transforms.ToTensor()
-        img_tensor = transform(img).permute(1, 2, 0)[..., :3]
-
+        img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
         images.append(img_tensor)
 
-    imgs_tensor = torch.cat(images, dim=2)
-
+    imgs_tensor = torch.cat(images, dim=2) #[h,w,15]
     return imgs_tensor
