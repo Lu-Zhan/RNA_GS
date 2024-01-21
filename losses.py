@@ -194,6 +194,21 @@ def obtain_sigma_xy(conics):
 
     return sigma_x, sigma_y
 
+#(gzx)
+def obtain_sigma_xy_rho(conics):
+    # conics is a tensor of shape (N, 3), inverse covariance matrix in upper triangular format, whose unit is pixel
+    # recover to covariance matrix
+    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
+    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
+
+    cov = torch.inverse(inv_cov)    # (N, 2, 2)
+
+    sigma_x = torch.sqrt(cov[:, 0, 0])    # (N, )
+    sigma_y = torch.sqrt(cov[:, 1, 1])    # (N, )
+    rho     = torch.sqrt((cov[:, 0, 1]*cov[:, 1, 0])/(cov[:, 0, 0]*cov[:, 1, 1]))
+
+    return sigma_x, sigma_y, rho
+
 
 # (lz) circle loss for 2D gaussian kernal
 def circle_loss(sigma_x, sigma_y):
@@ -211,6 +226,18 @@ def size_loss(sigma_x, sigma_y, min_size=6, max_size=12):
     loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(sigma_y - max_size).mean()
 
     return loss_x + loss_y
+
+#(gzx) calculate lamda1 and lamda2 for 2d gaussian
+def rho_loss(sigma_x, sigma_y, rho):
+    min_rho = 1
+    # rho should be in a range of [min_rho,1]
+    
+    lamda1_times2 = (sigma_x**2 + sigma_y**2) + torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+    lamda2_times2 = (sigma_x**2 + sigma_y**2) - torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+    
+    dis = torch.relu(min_rho - (lamda1_times2 / lamda2_times2))
+    
+    return dis.mean()
 
 
 # (zwx)

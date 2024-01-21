@@ -26,8 +26,10 @@ from losses import (
     otsu_codeloss,
     codebook_hamming_loss,
     obtain_sigma_xy,
+    obtain_sigma_xy_rho,
     size_loss,
     circle_loss,
+    rho_loss,
 )
 
 from utils import (
@@ -285,6 +287,10 @@ class SimpleTrainer:
             if self.cfg["w_code"] > 0:
                 loss_cos_dist, flag, formal_code_loss = codebook_loss(self.cfg["cali_loss_type"], alpha, self.codebook, flag, iter,formal_code_loss)
                 loss += self.cfg["w_code"] * loss_cos_dist
+            if self.cfg["w_rho"] > 0:
+                sigma_x, sigma_y, rho = obtain_sigma_xy_rho(conics)
+                loss_rho = rho_loss(sigma_x, sigma_y, rho)
+                loss += self.cfg["w_rho"] * loss_rho
 
             optimizer.zero_grad()
             start = time.time()
@@ -452,9 +458,12 @@ class SimpleTrainer:
     def validation(self, save_imgs, loss, out_img, persist_rgbs, conics, alpha, iter, iterations, frames, out_dir):
         if save_imgs and iter % 100 == 0:
             # count loss for validation
-            sigma_x, sigma_y = obtain_sigma_xy(conics)
+            # sigma_x, sigma_y = obtain_sigma_xy(conics)
+            sigma_x, sigma_y, rho = obtain_sigma_xy_rho(conics)
+
             loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
             loss_circle = circle_loss(sigma_x, sigma_y)
+            loss_rho = rho_loss(sigma_x, sigma_y, rho)
 
             loss_l1 = l1_loss(out_img, self.gt_image)
             loss_mse = mse_loss(out_img, self.gt_image)
@@ -498,6 +507,7 @@ class SimpleTrainer:
                     "loss/ssim": loss_ssim,
                     "loss/circle_loss": loss_circle,
                     "loss/size_loss": loss_size,
+                    "loss/rho_loss": loss_rho,
                     "psnr/mean": mean_psnr,
                     "dist/code_cos_loss": loss_cos_dist,
                     "dist/hm_nml_loss": loss_nml_hm_dist,
