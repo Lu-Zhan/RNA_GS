@@ -360,7 +360,7 @@ class SimpleTrainer:
                 out_dir=out_dir,
             )
         
-        # (lz) save all parameters into one pth file
+        # cyy: add what project need
         torch.save(
             {
                 "means": self.means,
@@ -370,6 +370,10 @@ class SimpleTrainer:
                 "opacities": self.opacities,
                 "viewmat": self.viewmat,
                 "persistent_mask": self.persistent_mask,
+                "focal": self.focal,
+                "H": self.H,
+                "W": self.W,
+                "tile_bounds": self.tile_bounds,
             }, 
             os.path.join(out_dir, "params.pth")
         )
@@ -406,11 +410,11 @@ class SimpleTrainer:
         print(
             f"Per step(s):\nProject: {times[0]/iterations:.5f}, Rasterize: {times[1]/iterations:.5f}, Backward: {times[2]/iterations:.5f}"
         )
-        # cyy ：增加写所有距离
+        # cyy ：增加训练结束时写所有距离
         write_to_csv_all(
-            image=self.gt_image[..., 0],
             pixel_coords=xys,
-            alpha=persist_rgbs,
+            sigma=conics,
+            alpha=alpha,
             save_path=f"{out_dir}/output_all.csv",
             h=self.H,
             w=self.W,

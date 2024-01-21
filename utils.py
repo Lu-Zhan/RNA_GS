@@ -11,7 +11,10 @@ from typing import Optional
 import argparse
 
 import matplotlib.pyplot as plt
-
+from losses import obtain_sigma_xy
+from gsplat.project_gaussians import project_gaussians
+from gsplat.rasterize import rasterize_gaussians
+from preprocess import images_to_tensor
 
 
 def read_codebook(path):
@@ -142,23 +145,74 @@ def write_to_csv(
             save_path.replace(".csv", f"_post{pos_threshold}.png"),
         )
 
-# cyy:增加写入所有度量方式的csv
+# cyy: 增加从ckpt读取并输出csv
+# usage: load_ckpt_write_to_csv(ckpt_path='outputs/ablation_baseline',img_path=Path("data/1213_demo_data_v2/raw1"),codebook_path=Path("data/codebook.xlsx"))
+def load_ckpt_write_to_csv(ckpt_path,img_path,codebook_path):
+    params_file = os.path.join(ckpt_path, "params.pth")
+    loaded_params = torch.load(params_file)
+    means = loaded_params["means"]
+    scales = loaded_params["scales"]
+    quats = loaded_params["quats"]
+    rgbs = loaded_params["rgbs"]
+    opacities = loaded_params["opacities"]
+    viewmat = loaded_params["viewmat"]
+    persistent_mask = loaded_params["persistent_mask"]
+    focal = loaded_params["focal"]
+    H = loaded_params["H"]
+    W = loaded_params["W"]
+    tile_bounds = loaded_params["tile_bounds"]
+    persist_means  = means [persistent_mask]
+    persist_scales = scales[persistent_mask]
+    persist_quats  = quats [persistent_mask]
+    persist_rgbs   = rgbs  [persistent_mask]
+    xys, depths, radii, conics, num_tiles_hit, cov3d = project_gaussians(
+                persist_means,
+                persist_scales,
+                1,
+                persist_quats,
+                viewmat,
+                viewmat,
+                focal,
+                focal,
+                W / 2,
+                H / 2,
+                H,
+                W,
+                tile_bounds,
+            )
+    alpha = torch.sigmoid(persist_rgbs)
+    gt_image = images_to_tensor(img_path)
+    write_to_csv_all(
+            pixel_coords=xys,
+            sigma=conics,
+            alpha=alpha,
+            save_path=f"{ckpt_path}/output_all_ckpt.csv",
+            h=H,
+            w=W,
+            ref=gt_image,
+            codebook_path = codebook_path,
+        )
+
+
+# cyy: 增加输出ppt格式的csv
 def write_to_csv_all(
     pixel_coords,
     alpha,
+    sigma,
     save_path,
     h,
     w,
-    image,
     ref=None,
-    pos_threshold = 30.0,
+    pos_threshold = 20.0,
     codebook_path="./data/codebook.xlsx",
 ):
     codebook = read_codebook(path=codebook_path)
     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
     expanded_codebook = codebook.unsqueeze(0)
     rna_name = read_codebook_name(path=codebook_path)
-    losses=['cos','mean','median','li']
+    sigma_x, sigma_y = obtain_sigma_xy(sigma)
+    # losses=['cos','mean','median','li']
+    losses=['cos']
     for loss in losses:
         if loss=="cos":
             pred_code = alpha
@@ -203,18 +257,19 @@ def write_to_csv_all(
                 {
                     "x": px,
                     "y": py,
-                    "class_index": (min_index + 1).flatten().data.cpu().numpy(),
-                    "classname": np.array(pred_name),
-                    # "min_distance_value": min_distance_values[:, 0].cpu().numpy(),
-                    "cos_score": (min_distance_values).detach().cpu().numpy(),
+                    "Class index": (min_index + 1).flatten().data.cpu().numpy(),
+                    "Class name": np.array(pred_name),
+                    # "cos_score": (min_distance_values).detach().cpu().numpy(),
                 }
             )
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
-            print(ref_scores.shape)
-            min_distance_values = ref_scores * min_distance_values
-            df['cos_score_post']=min_distance_values.detach().cpu().numpy()
-
+            min_distance_values = (ref_scores.cpu()) * (min_distance_values.cpu())
+            df['cos_simi']=min_distance_values.detach().cpu().numpy()
+            df['Sigma_x']=sigma_x.detach().cpu().numpy()
+            df['Sigma_y']=sigma_y.detach().cpu().numpy()
+            compressed_alpha = [' '.join([str(element) for element in row.tolist()]) for row in alpha]
+            df['15D value']=compressed_alpha
         else:
             min_distance_values=min_distance_values.flatten()
             df[f'hm_{loss}_score']=(1-min_distance_values).cpu().numpy()
@@ -222,7 +277,8 @@ def write_to_csv_all(
             ref_scores = torch.clamp(ref.max(dim=2)[0][(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
             hm_score = ref_scores * hm_score
             df[f'hm_{loss}_score_post']=(hm_score).cpu().numpy()
-    df.to_csv(save_path, index=False)
+        
+    df.to_csv(save_path, index=True)
 
 
 # (zwx)
@@ -436,6 +492,6 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=0):
     )
 
 if __name__ == "__main__":
-    pass
+    load_ckpt_write_to_csv(ckpt_path='outputs/ablation_baseline',img_path=Path("data/1213_demo_data_v2/raw1"),codebook_path=Path("data/codebook.xlsx"))
 
 

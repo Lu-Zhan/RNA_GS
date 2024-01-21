@@ -5,7 +5,7 @@ export WANDB_MODE=offline
 
 CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --weights 0 1 0 0 0 0 0 0 0 \
-    --iterations 1000 \
+    --iterations 2000 \
     --lr 0.002 \
     --exp_name ablation_baseline \
     --img_path ./data/1213_demo_data_v2/raw1 \
