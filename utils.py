@@ -57,7 +57,7 @@ def write_to_csv(
         image,
         ref=None,
         post_processing=False,
-        pos_threshold=0.0,
+        pos_threshold=20,
         codebook_path='data/codebook.xlsx'
     ):
 
@@ -89,7 +89,7 @@ def write_to_csv(
         #     print(ref_scores[i*20:i*20+20])
 
         scores, indexs = get_index_cos(pred_code, codebook)  # (num_samples,)
-        origin_scores = scores.copy()
+        origin_scores = scores.data.cpu().numpy().copy()
         indexs = indexs.data.cpu().numpy()
         
         total_scores = ref_scores * scores
@@ -272,7 +272,7 @@ def draw_results(image, px, py, pred_name, scores, save_path):
 
 
 def count_vaild_pixel(score, th=0.9):
-    return (score > 0.9).sum()
+    return (score > th).sum()
 
 
 def count_vaild_class(score, class_index, th=0.9):
@@ -302,9 +302,9 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=0):
     #plot 1:
 
     plt.subplot(1, 2, 1)
-    plt.hist(scores)
+    plt.hist(scores, bins=100)
     plt.title("scores")
-
+    plt.ylim(0, 500)
 
     images = []
     for i in range(1, 16):
@@ -318,18 +318,21 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=0):
 
     #(gzx):改用最大值而不是mean
     gt_image = image.max(axis=2)
-    ref_scores = np.clip(gt_image[(py,px)]*255.0 - pos_threshold, 0.0 ,10.0)/10.0
+    ref_scores = np.clip(gt_image[(py,px)]*255.0 - pos_threshold, 0.0 ,10.0) / 10.0
     scores = scores * ref_scores
     image = np.tile(gt_image[..., None], [1, 1, 3])
     
     #plot 2:
 
     plt.subplot(1, 2, 2)
-    plt.hist(scores)
-    plt.title("scores after postprocessing")
-    
-    plt.savefig(str(csv_path).replace(".csv","_hist.png"))
 
+    scores = scores[scores != 0]
+
+    plt.hist(scores, bins=100)
+    plt.title("scores after postprocessing")
+    plt.ylim(0, 500)
+    
+    plt.savefig(str(csv_path).replace(".csv", f"_hist_post{pos_threshold}.png"))
 
     draw_results(
         image,
@@ -352,21 +355,22 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=0):
 
     df.to_csv(str(csv_path).replace(".csv", f"_post{pos_threshold}.csv"), index=False)
 
-    print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.7))
-    print("number of vaild point (th=0.9)", count_vaild_pixel(score=scores, th=0.85))
-    print("number of vaild point (th=0.95)", count_vaild_pixel(score=scores, th=0.99))
+
+    print("number of vaild point (th=0.0001)", count_vaild_pixel(score=scores, th=0.0001))
+    print("number of vaild point (th=0.5)", count_vaild_pixel(score=scores, th=0.5))
+    print("number of vaild point (th=0.8)", count_vaild_pixel(score=scores, th=0.8))
 
     print(
+        "number of vaild class (th=0.0001)",
+        count_vaild_class(score=scores, class_index=pred_name, th=0.0001),
+    )
+    print(
+        "number of vaild class (th=0.5)",
+        count_vaild_class(score=scores, class_index=pred_name, th=0.5),
+    )
+    print(
         "number of vaild class (th=0.8)",
-        count_vaild_class(score=scores, class_index=pred_name, th=0.7),
-    )
-    print(
-        "number of vaild class (th=0.9)",
-        count_vaild_class(score=scores, class_index=pred_name, th=0.85),
-    )
-    print(
-        "number of vaild class (th=0.99)",
-        count_vaild_class(score=scores, class_index=pred_name, th=0.999),
+        count_vaild_class(score=scores, class_index=pred_name, th=0.8),
     )
 
 if __name__ == "__main__":
