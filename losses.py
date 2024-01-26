@@ -236,7 +236,7 @@ def rho_loss(sigma_x, sigma_y, rho):
     lamda1_times2 = (sigma_x**2 + sigma_y**2) + torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
     lamda2_times2 = (sigma_x**2 + sigma_y**2) - torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
     
-    dis = torch.relu(min_rho - (lamda1_times2 / lamda2_times2))
+    dis = (min_rho - (lamda1_times2 / lamda2_times2)) ** 2
     
     return dis.mean()
 
