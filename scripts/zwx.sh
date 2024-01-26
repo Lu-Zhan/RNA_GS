@@ -11,7 +11,7 @@ CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --codebook_path ./data/codebook.xlsx \
     --cali_loss_type "cos" \
     --dens_flags 0 0 0\
-    --pos_score 1 \
+    --pos_score 0 \
 
 CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --weights 0 1 0 0 0 0 0 0 0 0 0 0.01\
@@ -22,7 +22,7 @@ CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --codebook_path ./data/codebook.xlsx \
     --cali_loss_type "cos" \
     --dens_flags 0 0 0\
-    --pos_score 1 \
+    --pos_score 0 \
 
 CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --weights 0 1 0 0 0 0 0 0 0 0 0 0.001\
@@ -33,4 +33,4 @@ CUDA_VISIBLE_DEVICES=$gpu python train.py \
     --codebook_path ./data/codebook.xlsx \
     --cali_loss_type "cos" \
     --dens_flags 0 0 0\
-    --pos_score 1 \
+    --pos_score 0 \
