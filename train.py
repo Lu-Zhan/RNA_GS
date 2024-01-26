@@ -35,7 +35,8 @@ def main(
         0.1,
         0,
         0,
-    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, rho, mdp(maximum density projection)
+        0,
+    ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, rho, mdp(maximum density projection), mip(mean intensity projection)
     thresholds: list[float] = [
         0.1,
         0.04,
@@ -46,7 +47,7 @@ def main(
         False,
         False
     ], # prune, split, clone
-    size_range : list[int] = [6, 12],
+    size_range : list[int] = [1, 3],
 ) -> None:
     
     config = {
@@ -61,6 +62,7 @@ def main(
         "w_size": weights[8],
         "w_rho": weights[9],
         "w_mdp": weights[10],
+        "w_mip": weights[11],
         "prune_threshold" : thresholds[0],
         "grad_threshold" : thresholds[1],
         "gauss_threshold" : thresholds[2],

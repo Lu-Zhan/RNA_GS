@@ -31,6 +31,7 @@ from losses import (
     circle_loss,
     rho_loss,
     mdp_loss,
+    mip_loss,
 )
 
 from utils import (
@@ -263,6 +264,8 @@ class SimpleTrainer:
                 sigma_x, sigma_y = obtain_sigma_xy(conics)
             if self.cfg["w_mdp"] > 0: # (zwx) 
                 loss_mdp = mdp_loss(out_img, self.gt_image)
+            if self.cfg["w_mip"] > 0: # (zwx) 
+                loss_mdp = mip_loss(out_img, self.gt_image)
                 loss += self.cfg["w_mdp"] * loss_mdp
             if self.cfg["w_l1"] > 0:
                 loss_l1 = l1_loss(out_img, self.gt_image)
@@ -465,7 +468,7 @@ class SimpleTrainer:
             # sigma_x, sigma_y = obtain_sigma_xy(conics)
             sigma_x, sigma_y, rho = obtain_sigma_xy_rho(conics)
 
-            loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
+            loss_size = size_loss(sigma_x, sigma_y, min_size=1, max_size=3)
             loss_circle = circle_loss(sigma_x, sigma_y)
             loss_rho = rho_loss(sigma_x, sigma_y, rho)
 

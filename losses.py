@@ -219,13 +219,19 @@ def circle_loss(sigma_x, sigma_y):
 
 
 # (lz) size loss for 2D gaussian kernal
-def size_loss(sigma_x, sigma_y, min_size=9.7, max_size=10.7):
-    # sigma_x or sigma_y should be in a certain range of [6, 12]
+# (zwx) update L2 loss, out of the range of [1, 3]
+def size_loss(sigma_x, sigma_y, min_size=1, max_size=3):
+    # sigma_x or sigma_y should be in a certain range of [1, 3]
     # print(sigma_x)
     # print(sigma_y)
-    loss_x = torch.relu(min_size - sigma_x).mean() + torch.relu(sigma_x - max_size).mean()
-    loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(sigma_y - max_size).mean()
+    l1_term_x = torch.relu(min_size - sigma_x) + torch.relu(sigma_x - max_size)
+    l2_term_x = (torch.relu(min_size - sigma_x)) ** 2 + (torch.relu(max_size - sigma_x)) ** 2
+    loss_x = torch.where((sigma_x <= min_size) | (sigma_x >= max_size), l2_term_x, l1_term_x).mean()
 
+    l1_term_y = torch.relu(min_size - sigma_y) + torch.relu(sigma_y - max_size)
+    l2_term_y = (torch.relu(min_size - sigma_y)) ** 2 + (torch.relu(max_size - sigma_y)) ** 2
+    loss_y = torch.where((sigma_y <= min_size) | (sigma_y >= max_size), l2_term_y, l1_term_y).mean()
+    
     return loss_x + loss_y
 
 #(gzx) calculate lamda1 and lamda2 for 2d gaussian
@@ -241,7 +247,7 @@ def rho_loss(sigma_x, sigma_y, rho):
     return dis.mean()
 
 
-# (zwx)
+# (zwx) 
 def scale_loss(scale_x, scale_y):
     # sigma -> axis length, need modification
     scale_x = torch.sigmoid(scale_x)
@@ -306,9 +312,16 @@ def codebook_loss(type, alpha, codebook, flag, iter,formal_code_loss = 0):
     
     return loss_cos_dist, flag, formal_code_loss
 
-# (zwx) MSE after maximum density projection
+# (zwx) MSE after maximum intensity projection
 def mdp_loss(img, gt_img):
     MDP_img = img.max(axis = 2).values
     MDP_gt_img = gt_img.max(axis = 2).values
     mdp_mse = mse_loss(MDP_img, MDP_gt_img)
     return mdp_mse
+
+# (zwx) MSE after mean intensity projection
+def mip_loss(img, gt_img):
+    MIP_img = img.mean(axis = 2)
+    MIP_gt_img = gt_img.mean(axis = 2)
+    mip_mse = mse_loss(MIP_img, MIP_gt_img)
+    return mip_mse
