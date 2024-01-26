@@ -57,13 +57,74 @@ class SimpleTrainer:
         image_size: list = [401, 401, 3],
         densification_interval: int = 1000,
         cfg: Optional[dict] = None,
+        model_path:str = None,
     ):
+        #(gzx):load model weights to 
+        if model_path != None:
+            self.device = torch.device("cuda:0")
+
+            model = torch.load(model_path,map_location=torch.device(self.device))
+            
+            self.begin_iter = model["iters"]
+            self.means = model["means"]
+            self.rgbs = model["rgbs"]
+            self.persistent_mask = model["persistent_mask"]
+            self.scales = model["scales"]
+            self.quats = model["quats"]
+            self.opacities = model["opacities"]
+            self.viewmat = model["viewmat"]
+            self.current_marker = model["current_marker"]
+            self.H, self.W = model["H"],model["W"]
+            self.focal = model["focal"]
+            self.tile_bounds = model["tile_bounds"]
+            self.cfg = model["cfg"]
+            
+            cfg = self.cfg
+            
+            self.gt_image = gt_image.to(device=self.device)
+            self.num_points = self.means.shape[0]
+            # self.image_size = image_size
+            self.image_size = self.gt_image.shape
+            self.prune_threshold = cfg["prune_threshold"]
+            self.grad_threshold = cfg["grad_threshold"]
+            self.gauss_threshold = cfg["gauss_threshold"]
+            self.prune_flag = cfg["prune_flag"]
+            self.split_flag = cfg["split_flag"]
+            self.clone_flag = cfg["clone_flag"]
+            self.pos_score = cfg["pos_score"]
+            self.densification_interval = densification_interval
+            self.save_interval = cfg["save_interval"]
+            # self.kernal_size = kernal_size
+
+            BLOCK_X, BLOCK_Y = 16, 16
+            fov_x = math.pi / 2.0
+
+            self.img_size = torch.tensor([self.W, self.H, 1], device=self.device)
+            self.block = torch.tensor([BLOCK_X, BLOCK_Y, 1], device=self.device)
+            
+            self.means.requires_grad = True
+            self.scales.requires_grad = True
+            self.quats.requires_grad = True
+            self.rgbs.requires_grad = True
+            self.opacities.requires_grad = False
+            self.viewmat.requires_grad = False
+
+            self.codebook = torch.tensor(
+                read_codebook(cfg["codebook_path"]), device=self.device
+            )
+
+            self.output_folder = os.path.join("outputs", self.cfg["exp_name"])
+            os.makedirs(self.output_folder, exist_ok=True)          
+            return  
+        
+        self.begin_iter = 0
         self.device = torch.device("cuda:0")
         self.gt_image = gt_image.to(device=self.device)
         # self.num_points = num_points
         self.primary_samples = primary_samples
         self.backup_samples = backup_samples
-        self.image_size = image_size
+        # self.image_size = image_size
+        self.image_size = self.gt_image.shape
         self.prune_threshold = cfg["prune_threshold"]
         self.grad_threshold = cfg["grad_threshold"]
         self.gauss_threshold = cfg["gauss_threshold"]
@@ -73,6 +134,7 @@ class SimpleTrainer:
         self.initialization = cfg['initialization']
         self.pos_score = cfg["pos_score"]
         self.densification_interval = densification_interval
+        self.save_interval = cfg["save_interval"]
         # self.kernal_size = kernal_size
 
         BLOCK_X, BLOCK_Y = 16, 16
@@ -194,7 +256,7 @@ class SimpleTrainer:
         frames = []
         times = [0] * 3  # project, rasterize, backward
         formal_code_loss = 0
-        for iter in range(iterations):
+        for iter in range(self.begin_iter,iterations):
             
             #(gzx)
             if iter % (self.densification_interval + 1) == 0 and iter > 0 and self.prune_flag:
@@ -369,10 +431,32 @@ class SimpleTrainer:
                 frames=frames, 
                 out_dir=out_dir,
             )
+            
+            if ((iter + 1) % self.save_interval == 0):
+                torch.save(
+                    {
+                        "iters": iter + 1,
+                        "means": self.means,
+                        "scales": self.scales,
+                        "quats": self.quats,
+                        "rgbs": self.rgbs,
+                        "opacities": self.opacities,
+                        "viewmat": self.viewmat,
+                        "persistent_mask": self.persistent_mask,
+                        "focal": self.focal,
+                        "H": self.H,
+                        "W": self.W,
+                        "tile_bounds": self.tile_bounds,
+                        "current_marker": self.current_marker,
+                        "cfg": self.cfg,
+                    }, 
+                    os.path.join(out_dir, f"params_{iter+1}.pth")
+                )                
         
         # cyy: add what project need
         torch.save(
             {
+                "iters": iter + 1,
                 "means": self.means,
                 "scales": self.scales,
                 "quats": self.quats,
@@ -384,6 +468,9 @@ class SimpleTrainer:
                 "H": self.H,
                 "W": self.W,
                 "tile_bounds": self.tile_bounds,
+                "current_marker": self.current_marker,
+                "cfg": self.cfg,
+
             }, 
             os.path.join(out_dir, "params.pth")
         )

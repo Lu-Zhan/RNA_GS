@@ -17,13 +17,14 @@ def main(
     codebook_path: Optional[Path] = Path("data/codebook.xlsx"),
     iterations: int = 20000,
     densification_interval: int = 1000,
+    save_interval: int = 5000,
     lr: float = 0.002,
     exp_name: str = "debug",
     cali_loss_type: str = "cos",
     initialization: bool = False,
     pos_score: int = 1,
     eval:bool = False,
-    model_path:str = "RNA_GS/outputs/debug/params.pth",
+    model_path:str = None,
     weights: list[float] = [
         0,
         1,
@@ -73,6 +74,7 @@ def main(
         "primary_samples": primary_samples,
         "backup_samples": backup_samples,
         "densification_interval": densification_interval,
+        "save_interval": save_interval,
         "initialization": initialization,
         "pos_score": pos_score,
         "size_range": size_range,
@@ -88,18 +90,28 @@ def main(
 
     gt_image = images_to_tensor(img_path)
 
-    trainer = SimpleTrainer(
-        gt_image=gt_image,
-        primary_samples=primary_samples,
-        backup_samples=backup_samples,
-        cfg=config,
-        image_file_name=img_path,
-        densification_interval=densification_interval,
-    )
+
     if eval:
+        trainer = SimpleTrainer(
+            gt_image=gt_image,
+            primary_samples=primary_samples,
+            backup_samples=backup_samples,
+            cfg=config,
+            image_file_name=img_path,
+            densification_interval=densification_interval,
+        )
         os.environ['WANDB_MODE'] = 'offline'
         trainer.test(model_path=model_path)        
     else:
+        trainer = SimpleTrainer(
+            gt_image=gt_image,
+            primary_samples=primary_samples,
+            backup_samples=backup_samples,
+            cfg=config,
+            image_file_name=img_path,
+            densification_interval=densification_interval,
+            model_path=model_path,
+        )
         trainer.train(
             iterations=iterations,
             lr=lr,

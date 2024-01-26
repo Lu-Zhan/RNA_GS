@@ -90,4 +90,6 @@ def images_to_tensor(image_path: Path):
         images.append(img_tensor)
 
     imgs_tensor = torch.cat(images, dim=2) #[h,w,15]
+    if imgs_tensor.max()>1:
+       imgs_tensor = torch.clamp(imgs_tensor,0,3000)/3000 
     return imgs_tensor
