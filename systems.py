@@ -435,30 +435,30 @@ class SimpleTrainer:
             codebook_path = self.cfg["codebook_path"],
         )
         # (zwx) save csv
-        # if self.cfg["cali_loss_type"] == "cos":
-        #     write_to_csv(
-        #         image=self.gt_image[..., 0],
-        #         pixel_coords=xys,
-        #         alpha=persist_rgbs,
-        #         save_path=f"{out_dir}/output.csv",
-        #         h=self.H,
-        #         w=self.W,
-        #         ref=self.gt_image,
-        #         post_processing=self.pos_score,
-        #         codebook_path = self.cfg["codebook_path"],
-        # )
-        # elif self.cfg["cali_loss_type"] in ["mean", "median", "li", "otsu"]:
-            # write_to_csv_hamming(
-            #     image=self.gt_image[..., 0],
-            #     pixel_coords=xys,
-            #     alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
-            #     save_path=f"{out_dir}/output.csv",
-            #     h=self.H,
-            #     w=self.W,
-            #     ref=self.gt_image,
-            #     post_processing=self.pos_score,
-            #     loss=self.cfg["cali_loss_type"],
-            # )
+        if self.cfg["cali_loss_type"] == "cos":
+            write_to_csv(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=persist_rgbs,
+                save_path=f"{out_dir}/output.csv",
+                h=self.H,
+                w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
+                codebook_path = self.cfg["codebook_path"],
+        )
+        elif self.cfg["cali_loss_type"] in ["mean", "median", "li", "otsu"]:
+            write_to_csv_hamming(
+                image=self.gt_image[..., 0],
+                pixel_coords=xys,
+                alpha=persist_rgbs, # (zwx) self.rgbs -> persist_rgbs
+                save_path=f"{out_dir}/output.csv",
+                h=self.H,
+                w=self.W,
+                ref=self.gt_image,
+                post_processing=self.pos_score,
+                loss=self.cfg["cali_loss_type"],
+            )
 
     # (lz) separate validation function
     @torch.no_grad()

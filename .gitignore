@@ -1,6 +1,7 @@
 exps/
 outputs/
 wandb/
+his/
 *.pyc
 data/
 __pycache__

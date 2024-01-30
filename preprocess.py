@@ -77,10 +77,9 @@ def images_to_tensor(image_path: Path):
     import glob
 
     # image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
-    image_paths = [image_path / f"{i}.png" for i in range(1, 16)]
+    #image_paths = [image_path / f"{i}.png" for i in range(1, 16)]
 
     image_paths = [image_path / f"{i}.png" for i in range(1, 16)]
-
     images = []
 
     for image_path in image_paths:
@@ -89,5 +88,9 @@ def images_to_tensor(image_path: Path):
         img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
         images.append(img_tensor)
 
-    imgs_tensor = torch.cat(images, dim=2) #[h,w,15]
+    imgs_tensor = torch.cat(images, dim=2).float() #[h,w,15]
+    # clipped_imgs_tensor = torch.clamp(imgs_tensor, 0, 3000)
+    # # 进行归一化
+    # normalized_imgs_tensor = torch.nn.functional.normalize(clipped_imgs_tensor, dim=2)
+    # cropped_imgs_tensor = normalized_imgs_tensor[:192, :192, :]
     return imgs_tensor
