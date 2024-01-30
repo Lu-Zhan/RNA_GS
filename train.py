@@ -36,6 +36,7 @@ def main(
         0.1,
         0,
         0,
+        0,
     ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, rho, mdp(maximum density projection)
     thresholds: list[float] = [
         0.1,

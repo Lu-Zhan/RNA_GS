@@ -76,10 +76,7 @@ def images_to_tensor(image_path: Path):
     import torchvision.transforms as transforms
     import glob
 
-    # image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
-    image_paths = [image_path / f"{i}.png" for i in range(1, 16)]
-
-    image_paths = [image_path / f"{i}.png" for i in range(1, 16)]
+    image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
 
     images = []
 
@@ -89,7 +86,13 @@ def images_to_tensor(image_path: Path):
         img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
         images.append(img_tensor)
 
-    imgs_tensor = torch.cat(images, dim=2) #[h,w,15]
-    if imgs_tensor.max()>1:
-       imgs_tensor = torch.clamp(imgs_tensor,0,3000)/3000 
+    imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
+    imgs_tensor = torch.log10(imgs_tensor + 1) / torch.log10(torch.tensor([2801])) # [h,w,15]
+    imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
+
     return imgs_tensor
+
+
+if __name__ == '__main__':
+    image = images_to_tensor(Path('../data/IM41340_0124'))
+    print('done')

@@ -228,6 +228,7 @@ def size_loss(sigma_x, sigma_y, min_size=9.7, max_size=10.7):
 
     return loss_x + loss_y
 
+
 #(gzx) calculate lamda1 and lamda2 for 2d gaussian
 def rho_loss(sigma_x, sigma_y, rho):
     min_rho = 1

@@ -54,7 +54,7 @@ class SimpleTrainer:
         primary_samples: int = 20000,
         backup_samples: int = 8000,
         image_file_name: Path = "",
-        image_size: list = [401, 401, 3],
+        image_size: list = [4001, 4001, 3],
         densification_interval: int = 1000,
         cfg: Optional[dict] = None,
         model_path:str = None,
