@@ -80,11 +80,10 @@ def image_path_to_tensor(image_path: Path):
 def images_to_tensor(image_path: Path):
     import torchvision.transforms as transforms
 
-    try:
-        image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
-    except:
-        image_paths = [image_path / f'{i}.png' for i in range(1, 16)]
-        
+    if (image_path / Path(f'1.png')).exists():
+        image_paths = [image_path / Path(f'{i}.png') for i in range(1, 16)]
+    else:
+        image_paths = [image_path / Path(f'F1R{r}Ch{c}.png') for r in range(1, 6) for c in range(2, 5)]
 
     images = []
 

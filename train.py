@@ -5,6 +5,7 @@ import os
 
 from pathlib import Path
 from typing import Optional
+from time import time
 
 from systems import SimpleTrainer
 from preprocess import images_to_tensor
@@ -127,11 +128,15 @@ def main(
             densification_interval=densification_interval,
             model_path=model_path,
         )
+
+        
+        start_time = time()
         trainer.train(
             iterations=iterations,
             lr=lr,
             save_imgs=save_imgs,
         )
+        print("Training time:", time() - start_time)
 
 
 if __name__ == "__main__":
