@@ -25,17 +25,18 @@ def main(
     eval:bool = False,
     model_path:str = "RNA_GS/outputs/debug/params.pth",
     weights: list[float] = [
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        0.001,
-        0.1,
-        0,
-        0,
-        0,
+        0,  # l1
+        1,  # l2
+        0,  # lml1
+        0,  # lml2
+        0,  # bg
+        0,  # ssim
+        0.001,  # code_cos
+        0.1,    # circle
+        0,      # size
+        0,      # rho
+        0,      # mdp
+        0,      # mip
     ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, rho, mdp(maximum density projection), mip(mean intensity projection)
     thresholds: list[float] = [
         0.1,
@@ -81,7 +82,7 @@ def main(
     }
 
     wandb.init(
-        project="rna_cali_0120",
+        project="rna_cali_0130",
         config=config,
         name=config["exp_name"],
     )
