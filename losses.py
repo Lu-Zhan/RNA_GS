@@ -178,3 +178,147 @@ def codebook_hamming_loss(pred_code, codebook, mode):
     min_dist = hamming_distance.min(dim=-1)[0]
     min_list = hamming_distance.min(dim=-1)[1]
     return min_dist.mean(), min_dist
+
+
+# (lz) compute sigma_x and sigma_y from conics
+def obtain_sigma_xy(conics):
+    # conics is a tensor of shape (N, 3), inverse covariance matrix in upper triangular format, whose unit is pixel
+    # recover to covariance matrix
+    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
+    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
+
+    cov = torch.inverse(inv_cov)    # (N, 2, 2)
+
+    sigma_x = torch.sqrt(cov[:, 0, 0])    # (N, )
+    sigma_y = torch.sqrt(cov[:, 1, 1])    # (N, )
+
+    return sigma_x, sigma_y
+
+#(gzx)
+def obtain_sigma_xy_rho(conics):
+    # conics is a tensor of shape (N, 3), inverse covariance matrix in upper triangular format, whose unit is pixel
+    # recover to covariance matrix
+    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
+    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
+
+    cov = torch.inverse(inv_cov)    # (N, 2, 2)
+
+    sigma_x = torch.sqrt(cov[:, 0, 0])    # (N, )
+    sigma_y = torch.sqrt(cov[:, 1, 1])    # (N, )
+    rho     = torch.sqrt((cov[:, 0, 1]*cov[:, 1, 0])/(cov[:, 0, 0]*cov[:, 1, 1]))
+
+    return sigma_x, sigma_y, rho
+
+
+# (lz) circle loss for 2D gaussian kernal
+def circle_loss(sigma_x, sigma_y):
+    # the difference betwwen sigma_x and sigma_y should be small
+    # sigma_x and sigma_y are tensors of shape (N, )
+
+    return ((sigma_x - sigma_y) ** 2).mean()
+
+
+# (lz) size loss for 2D gaussian kernal
+def size_loss(sigma_x, sigma_y, min_size=9.7, max_size=10.7):
+    # sigma_x or sigma_y should be in a certain range of [6, 12]
+    # print(sigma_x)
+    # print(sigma_y)
+    loss_x = torch.relu(min_size - sigma_x).mean() + torch.relu(sigma_x - max_size).mean()
+    loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(sigma_y - max_size).mean()
+
+    return loss_x + loss_y
+
+# (gzx) size loss for 2D gaussian kernal
+def r1r2_loss(r1r2, min_size=0.8, max_size=1):
+    # sigma_x or sigma_y should be in a certain range of [6, 12]
+    # print(sigma_x)
+    # print(sigma_y)
+    loss = torch.relu(min_size - r1r2).mean() + torch.relu(r1r2 - max_size).mean()
+
+    return loss
+
+
+#(gzx) calculate lamda1 and lamda2 for 2d gaussian
+def rho_loss(sigma_x, sigma_y, rho):
+    min_rho = 1
+    # rho should be in a range of [min_rho,1]
+    
+    lamda1_times2 = (sigma_x**2 + sigma_y**2) + torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+    lamda2_times2 = (sigma_x**2 + sigma_y**2) - torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+    
+    dis = (min_rho - (lamda1_times2 / lamda2_times2)) ** 2
+    
+    return dis.mean()
+
+
+# (zwx)
+def scale_loss(scale_x, scale_y):
+    # sigma -> axis length, need modification
+    scale_x = torch.sigmoid(scale_x)
+    scale_y = torch.sigmoid(scale_y)
+    diff_x = scale_x - torch.clamp(scale_x, 0.12, 0.24)
+    diff_y = scale_y - torch.clamp(scale_x, 0.12, 0.24)
+    scale_loss_x = torch.where(
+        torch.abs(diff_x) < 0.5,
+        0.5 * diff_x**2,
+        0.5 * (torch.abs(diff_x) - 0.5 * 0.5),
+    )
+    scale_loss_y = torch.where(
+        torch.abs(diff_y) < 0.5,
+        0.5 * diff_y**2,
+        0.5 * (torch.abs(diff_y) - 0.5 * 0.5),
+    )
+    scale_loss = torch.mean(scale_loss_x) + torch.mean(scale_loss_y)
+    return scale_loss
+
+
+def codebook_loss(type, alpha, codebook, flag, iter,formal_code_loss = 0):
+    if type == "cos":
+        loss_cos_dist = codebook_cos_loss(alpha, codebook)
+        formal_code_loss = 0
+    else:
+        if flag:
+            loss_cos_dist, _ = codebook_hamming_loss(
+                alpha, codebook, "normal"
+            )
+        else:
+            if type == "mean":
+                loss_cos_dist, _ = codebook_hamming_loss(
+                    alpha, codebook, "mean"
+                )
+            elif type == "median":
+                loss_cos_dist, _ = codebook_hamming_loss(
+                    alpha, codebook, "median"
+                )
+            elif type == "li":
+                loss_cos_dist, _ = li_codeloss(alpha, codebook)
+            elif type == "otsu":
+                loss_cos_dist, _ = otsu_codeloss(alpha, codebook)
+        if iter == 0:
+            formal_code_loss = abs(loss_cos_dist.item())
+        elif (
+            iter % 200 == 0
+            and abs(formal_code_loss - loss_cos_dist) < 0.01
+            and flag == True
+        ):
+            # print(f'start using {self.cfg["cali_loss_type"]} as threshold')
+            formal_code_loss = loss_cos_dist.item()
+            flag = False
+        elif iter % 200 == 0:
+            formal_code_loss = loss_cos_dist.item()
+
+        tolerance = 2 / 15.0
+
+        if loss_cos_dist < tolerance:
+            loss_cos_dist = 0
+        else:
+            loss_cos_dist -= tolerance
+    
+    return loss_cos_dist, flag, formal_code_loss
+
+# (zwx) MSE after maximum density projection
+def mdp_loss(img, gt_img):
+    MDP_img = img.max(axis = 2).values
+    MDP_gt_img = gt_img.max(axis = 2).values
+    mdp_mse = mse_loss(MDP_img, MDP_gt_img)
+    return mdp_mse
