@@ -203,7 +203,10 @@ class SimpleTrainer:
         colour_values, pixel_coords = give_required_data(
             coords, self.image_size, self.gt_image, self.device
         )
+
+
         self.xys = torch.from_numpy(coords.astype(np.float32)).to(self.device)
+
         self.rgbs = (
             torch.ones(self.num_points, self.gt_image.shape[-1], device=self.device)
             # * torch.clamp(colour_values,0.02,0.98)
@@ -233,7 +236,7 @@ class SimpleTrainer:
         self.sigma_x.requires_grad = True
         self.sigma_y.requires_grad = True
         self.rgbs.requires_grad = True
-        self.opacities.requires_grad = True
+        self.opacities.requires_grad = False
 
         # W_values = torch.cat([self.scales, self.quats, self.rgbs, self.means], dim=1)
 
@@ -273,12 +276,14 @@ class SimpleTrainer:
             xys, rho, sigma_x, sigma_y, persist_rgbs, persist_opacities = self.get_persist()
 
 
-            depths,radii,conics,num_tiles_hit=project_gaussians_2D(sigma_x,
-                                                                       sigma_y,
-                                                                       rho,
-                                                                       self.xys.shape[0],
-                                                                       self.depth,
-                                                                       device=self.device)
+            depths, radii, conics, num_tiles_hit = project_gaussians_2D(
+                sigma_x,
+                sigma_y,
+                rho,
+                self.xys.shape[0],
+                self.depth,
+                device=self.device
+            )
             
             if (iter == 0): 
                 for i in range(10):
@@ -290,7 +295,6 @@ class SimpleTrainer:
             torch.cuda.synchronize()
             times[0] += time.time() - start
             start = time.time()
-            
 
             out_img = rasterize_gaussians(
                 xys,
@@ -316,7 +320,6 @@ class SimpleTrainer:
 
             # (lz) count loss required for training
             if self.cfg["w_size"] > 0 or self.cfg["w_rho"] > 0:
-                
                 lambda1, lambda2 = get_lambda(sigma_x,sigma_y,rho)
                 r1, r2 = (torch.sqrt(3 * lambda1)), (torch.sqrt(3 * lambda2))
                                 
@@ -345,8 +348,6 @@ class SimpleTrainer:
                 loss_circle = circle_loss(sigma_x, sigma_y)
                 loss += self.cfg["w_circle"] * loss_circle
             if self.cfg["w_size"] > 0:
-
-                
                 loss_size = size_loss(r1, r2, min_size=self.cfg["size_range"][0], max_size=self.cfg["size_range"][1])
                 loss += self.cfg["w_size"] * loss_size
                 
@@ -356,12 +357,7 @@ class SimpleTrainer:
                 
             if self.cfg["w_rho"] > 0:
                 loss_rho = r1r2_loss(r2 / r1)
-                loss += self.cfg["w_rho"] * loss_rho
-
-
-            # loss_rho = rho_loss(sigma_x, sigma_y, rho)
-            # loss += 0.001 * loss_rho
-                        
+                loss += self.cfg["w_rho"] * loss_rho                        
 
             optimizer.zero_grad()
             start = time.time()
@@ -443,6 +439,7 @@ class SimpleTrainer:
                 sigma_y=sigma_y,
                 rho=rho
             )
+
             if ((iter) % 500 == 0):
                 write_to_csv_all(
                     pixel_coords=xys,
@@ -454,9 +451,6 @@ class SimpleTrainer:
                     ref=self.gt_image,
                     codebook_path = self.cfg["codebook_path"],
                 )
-                # print(sigma_x)
-                # print(radii)
-                # exit(0)
             
             if ((iter + 1) % self.save_interval == 0):
                 torch.save(
@@ -477,8 +471,8 @@ class SimpleTrainer:
                         "current_marker": self.current_marker,
                         "cfg": self.cfg,
                     }, 
-                            os.path.join(out_dir, f"params_{iter+1}.pth")
-                        )                
+                    os.path.join(out_dir, f"params_{iter+1}.pth")
+                )                
                 
         # cyy: add what project need
         torch.save(
@@ -534,6 +528,7 @@ class SimpleTrainer:
         print(
             f"Per step(s):\nProject: {times[0]/iterations:.5f}, Rasterize: {times[1]/iterations:.5f}, Backward: {times[2]/iterations:.5f}"
         )
+
         # cyy ：增加训练结束时写所有距离
         write_to_csv_all(
             pixel_coords=xys,

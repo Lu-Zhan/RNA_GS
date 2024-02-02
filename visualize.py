@@ -42,6 +42,7 @@ def view_output(pred, gt):
 
     return data
 
+
 def view_points(gt, px, py, scores, save_path):
     # view pred and gt images in 15 groups.
     # for each group, pred on left, gt on right, pred: [h, w, 15], gt: [h, w, 15], using heatmap
@@ -54,7 +55,6 @@ def view_points(gt, px, py, scores, save_path):
 
     for i in range(4):
         for j in range(4):
-            
             if i * 4 + j == 15:
                 # sc
                 axs[i , j].imshow(
@@ -69,7 +69,7 @@ def view_points(gt, px, py, scores, save_path):
                 gt[..., i * 4 + j], cmap=plt.get_cmap('gray'), interpolation="nearest"
             )
             
-            axs[i , j].scatter(px, py, color="red", alpha=scores[:,i * 4 + j], cmap="jet", s=2)
+            axs[i , j].scatter(px, py, color="red", alpha=scores[:,i * 4 + j], s=2)
 
             axs[i , j].axis("off")
             axs[i , j].set_title(f"SC {i * 4 + j}")

@@ -396,10 +396,7 @@ def draw_results(image, px, py, pred_name, scores, save_path):
     ax.imshow(image)
     scores = np.clip(scores, 0, 1)
     scores = scores
-    # # scores = (scores - 0.95) / 0.05
-    # # scores = np.clip(scores, 0, 1)
-    # ax.scatter(py, px, alpha=scores, cmap=cm.jet, s=2)
-    ax.scatter(px, py,color="red", alpha=scores, cmap=cm.jet, s=2)
+    ax.scatter(px, py, color="red", alpha=scores, s=2)
 
     # for i, txt in enumerate(pred_name):
     #     ax.annotate(txt, (px[i], py[i]))
@@ -426,11 +423,17 @@ def count_vaild_class(score, class_index, th=0.9):
 def read_and_vis_results(csv_path,img_path,pos_threshold=20):
     df = pd.read_csv(csv_path)
 
+    # px = df["x"].values
+    # py = df["y"].values
+    # pred_name = df["gene"].values
+    # scores = df["score"].values
+    # index = df["index"].values
+
     px = df["x"].values
     py = df["y"].values
-    pred_name = df["gene"].values
-    scores = df["score"].values
-    index = df["index"].values
+    pred_name = df["Class name"].values
+    scores = df["cos_simi"].values
+    index = df["Class index"].values
 
     from PIL import Image
     
@@ -509,6 +512,7 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=20):
         count_vaild_class(score=scores, class_index=pred_name, th=0.8),
     )
 
+
 # (zwx) PSNR after maximum density projection
 def MDP_recon_psnr(img, gt_img):
     MDP_img = img.max(axis = 2).values
@@ -517,6 +521,7 @@ def MDP_recon_psnr(img, gt_img):
     mse = mse_loss(MDP_img, MDP_gt_img)
     MDP_PSNR =  float(10 * torch.log10(1 / mse))
     return MDP_PSNR
+
 
 if __name__ == "__main__":
     load_ckpt_write_to_csv(ckpt_path='outputs/ablation_baseline',img_path=Path("data/1213_demo_data_v2/raw1"),codebook_path=Path("data/codebook.xlsx"))
