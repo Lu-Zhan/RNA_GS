@@ -74,7 +74,6 @@ def image_path_to_tensor(image_path: Path):
 
 def images_to_tensor(image_path: Path):
     import torchvision.transforms as transforms
-    import glob
 
     image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
 
@@ -91,6 +90,24 @@ def images_to_tensor(image_path: Path):
     imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
 
     return imgs_tensor
+
+def images_to_tensor_cropped(image_path: Path):
+    import torchvision.transforms as transforms
+
+    image_paths = [image_path / f'{i}.png' for i in range(1, 16)]
+
+    images = []
+
+    for image_path in image_paths:
+        img = Image.open(image_path)
+        transform = transforms.ToTensor()
+        img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
+        images.append(img_tensor)
+
+    imgs_tensor = torch.cat(images, dim=2) / 255. # [h, w, 15]
+
+    return imgs_tensor
+
 
 
 if __name__ == '__main__':

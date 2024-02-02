@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from systems import SimpleTrainer
-from preprocess import images_to_tensor
+from preprocess import images_to_tensor, images_to_tensor_cropped
 
 def main(
     primary_samples: int = 8000,
@@ -89,7 +89,10 @@ def main(
 
     print(f"Running with config: {config}")
 
-    gt_image = images_to_tensor(img_path)
+    try:
+        gt_image = images_to_tensor(img_path)
+    except:
+        gt_image = images_to_tensor_cropped(img_path)
 
 
     if eval:
