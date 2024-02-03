@@ -10,9 +10,12 @@ from PIL import Image
 from pathlib import Path
 from typing import Optional
 from torch import Tensor, optim
+from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
+
 from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 from gsplat2d import *
+
 
 from losses import (
     mse_loss,
@@ -257,6 +260,14 @@ class SimpleTrainer:
             [self.rgbs, self.xys, self.sigma_x, self.sigma_y, self.rho],
             lr,  # (lz) do not update opacities
         )
+
+        # scheduler = CosineAnnealingLR(
+        #     optimizer, 
+        #     T_max=int(iterations), # Maximum number of iterations. 
+        #     eta_min=0.01 * lr) # Minimum learning rate.
+
+        scheduler = StepLR(optimizer, step_size=5000, gamma=0.4)
+
         # start0 = time.time() #(gzx):计算时间
         frames = []
         times = [0] * 3  # project, rasterize, backward
@@ -376,9 +387,6 @@ class SimpleTrainer:
                 # loss_rho = r1r2_loss(r2 / r1)
                 loss_rho = rho_loss(rho)
 
-                if torch.isnan(rho).any():
-                    print("rho nan")
-
                 loss += self.cfg["w_rho"] * loss_rho
 
             optimizer.zero_grad()
@@ -466,6 +474,8 @@ class SimpleTrainer:
             times[2] += time.time() - start
             optimizer.step()
 
+            scheduler.step()
+
             self.validation(
                 save_imgs=save_imgs,
                 loss=loss,
@@ -480,6 +490,7 @@ class SimpleTrainer:
                 sigma_x=sigma_x,
                 sigma_y=sigma_y,
                 rho=rho,
+                lr=scheduler.get_last_lr()[0],
             )
 
             # if (iter) % 500 == 0:
@@ -607,6 +618,7 @@ class SimpleTrainer:
         sigma_x,
         sigma_y,
         rho,
+        lr
     ):
         if save_imgs and iter % 500 == 0:
             # count loss for validation
@@ -647,7 +659,7 @@ class SimpleTrainer:
             # (zwx) mpd_psnr
             mdp_psnr = MDP_recon_psnr(out_img, self.gt_image)
             print(
-                f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}, mdpPSNR: {mdp_psnr:.2f}",
+                f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}, mdpPSNR: {mdp_psnr:.2f}, lr: {lr:.6f}", 
                 flush=True,
             )
 
@@ -673,6 +685,7 @@ class SimpleTrainer:
                     # "dist/hm_li_loss": loss_li_hm_dist,
                     # "dist/hm_otsu_loss": loss_otsu_hm_dist,
                     "loss/mdp_loss": loss_mdp,
+                    "lr": lr,
                 },
                 step=iter,
             )

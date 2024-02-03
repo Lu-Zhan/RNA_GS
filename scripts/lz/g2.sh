@@ -4,7 +4,7 @@ gpu=3
 
 # exp_name=crop400_processed_num4k_it20k
 
-for n in {0..18}
+for n in {19..35}
 do  
     img_path=../data/IM41340_processed/${n}_36
 	exp_name=v2_c1e-3_mdp1_lml2-0.5_bg1_size0.01-3-7_coslr0.1_tile${n}-36
