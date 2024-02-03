@@ -236,7 +236,7 @@ class SimpleTrainer:
 
         self.opacities = torch.ones((self.num_points, 1), device=self.device) * 1
 
-        self.depth = 30.0
+        self.depth = 30
 
         self.xys.requires_grad = True
         self.rho.requires_grad = True
@@ -539,18 +539,18 @@ class SimpleTrainer:
         )
 
         # (zwx) print code loss
-        print(
-            "test_li:",
-            li_codeloss(persist_rgbs, self.codebook)[0].item(),
-            "test_otsu:",
-            otsu_codeloss(persist_rgbs, self.codebook)[0].item(),
-            "test_hamming_normal:",
-            codebook_hamming_loss(persist_rgbs, self.codebook, "normal")[0].item(),
-            "test_hamming_mean:",
-            codebook_hamming_loss(persist_rgbs, self.codebook, "mean")[0].item(),
-            "test_hamming_median:",
-            codebook_hamming_loss(persist_rgbs, self.codebook, "median")[0].item(),
-        )
+        # print(
+        #     "test_li:",
+        #     li_codeloss(persist_rgbs, self.codebook)[0].item(),
+        #     "test_otsu:",
+        #     otsu_codeloss(persist_rgbs, self.codebook)[0].item(),
+        #     "test_hamming_normal:",
+        #     codebook_hamming_loss(persist_rgbs, self.codebook, "normal")[0].item(),
+        #     "test_hamming_mean:",
+        #     codebook_hamming_loss(persist_rgbs, self.codebook, "mean")[0].item(),
+        #     "test_hamming_median:",
+        #     codebook_hamming_loss(persist_rgbs, self.codebook, "median")[0].item(),
+        # )
 
         if save_imgs:
             # save them as a gif with PIL
@@ -625,13 +625,13 @@ class SimpleTrainer:
             loss_ssim = ssim_loss(out_img, self.gt_image)
 
             loss_cos_dist = codebook_cos_loss(alpha, self.codebook)
-            loss_nml_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "normal")
-            loss_mean_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "mean")
-            loss_median_hm_dist, _ = codebook_hamming_loss(
-                alpha, self.codebook, "median"
-            )
-            loss_li_hm_dist, _ = li_codeloss(alpha, self.codebook)
-            loss_otsu_hm_dist, _ = otsu_codeloss(alpha, self.codebook)
+            # loss_nml_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "normal")
+            # loss_mean_hm_dist, _ = codebook_hamming_loss(alpha, self.codebook, "mean")
+            # loss_median_hm_dist, _ = codebook_hamming_loss(
+            #     alpha, self.codebook, "median"
+            # )
+            # loss_li_hm_dist, _ = li_codeloss(alpha, self.codebook)
+            # loss_otsu_hm_dist, _ = otsu_codeloss(alpha, self.codebook)
 
             loss_mdp = mdp_loss(out_img, self.gt_image)
 
@@ -667,11 +667,11 @@ class SimpleTrainer:
                     "psnr/mean": mean_psnr,
                     "MDPpsnr": mdp_psnr,
                     "dist/code_cos_loss": loss_cos_dist,
-                    "dist/hm_nml_loss": loss_nml_hm_dist,
-                    "dist/hm_mean_loss": loss_mean_hm_dist,
-                    "dist/hm_median_loss": loss_median_hm_dist,
-                    "dist/hm_li_loss": loss_li_hm_dist,
-                    "dist/hm_otsu_loss": loss_otsu_hm_dist,
+                    # "dist/hm_nml_loss": loss_nml_hm_dist,
+                    # "dist/hm_mean_loss": loss_mean_hm_dist,
+                    # "dist/hm_median_loss": loss_median_hm_dist,
+                    # "dist/hm_li_loss": loss_li_hm_dist,
+                    # "dist/hm_otsu_loss": loss_otsu_hm_dist,
                     "loss/mdp_loss": loss_mdp,
                 },
                 step=iter,
@@ -693,10 +693,12 @@ class SimpleTrainer:
     def get_persist(self):
         xys = torch.clamp(torch.tanh(self.xys[self.persistent_mask]) * 1.02, -1, 1)
         rho = torch.sigmoid(self.rho[self.persistent_mask])
+        
         sigma_x = torch.sigmoid(self.sigma_x[self.persistent_mask]) * 5
         sigma_y = torch.sigmoid(self.sigma_y[self.persistent_mask]) * 5
         persist_rgbs = torch.sigmoid(self.rgbs[self.persistent_mask])
-        persist_opacities = torch.sigmoid(self.opacities[self.persistent_mask])
+
+        persist_opacities = self.opacities[self.persistent_mask]
 
         return xys, rho, sigma_x, sigma_y, persist_rgbs, persist_opacities
 

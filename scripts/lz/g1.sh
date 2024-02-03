@@ -4,15 +4,15 @@ gpu=3
 
 # exp_name=crop400_processed_num4k_it20k
 
-for n in {0..15}
+for n in {0..0}
 do  
-    img_path=../data/IM41340_processed/${n}
-	exp_name=v1_c1e-3_mdp1_tile${n}
+    img_path=../data/IM41340_processed/${n}_36
+	exp_name=v2_c1e-3_mdp1_lml2-0.5_bg1_brt0.1_tile${n}-36
 
     CUDA_VISIBLE_DEVICES=$gpu python train.py \
-        --weights 0 1 0 0 0 0 0.001 0 0 0 1 \
+        --weights 0 1 0 0.5 1 0 0.001 0 0 0 1 \
         --iterations 20000 \
-        --lr 0.003 \
+        --lr 0.002 \
         --primary_samples 12000 \
         --backup_samples 0 \
         --pos_score 1 \
