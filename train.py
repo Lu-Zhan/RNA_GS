@@ -11,7 +11,7 @@ from systems import SimpleTrainer
 from preprocess import images_to_tensor
 
 def main(
-    primary_samples: int = 8000,
+    primary_samples: int = 4000,
     backup_samples: int = 0,
     save_imgs: bool = True,
     img_path: Optional[Path] = Path("data/1213_demo_data_v2/raw1"),
@@ -32,11 +32,11 @@ def main(
         0,
         0,
         0,
+        0.1,
         0,
         0,
         0,
-        0.001,
-        0.001,
+        0,
         0,
     ],  # l1, l2, lml1, lml2, bg, ssim, code_cos, circle, size, rho, mdp(maximum density projection)
     thresholds: list[float] = [

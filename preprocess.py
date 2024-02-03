@@ -94,8 +94,12 @@ def images_to_tensor(image_path: Path):
         images.append(img_tensor)
 
     imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
-    print("Max image value:", imgs_tensor.max())
-    imgs_tensor = torch.log10(imgs_tensor + 1) / torch.log10(torch.tensor([2801])) # [h,w,15]
+
+    positive_image = imgs_tensor[imgs_tensor > 20 / 255 * 1600]
+
+    top_value = positive_image.mean() + 5 * positive_image.std()
+    print("Max value:", imgs_tensor.max(), 'Top value:', top_value)
+    imgs_tensor = torch.log10(imgs_tensor + 1) / torch.log10(torch.tensor([top_value])) # [h,w,15]
     imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
 
     return imgs_tensor

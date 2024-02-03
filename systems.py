@@ -163,9 +163,9 @@ class SimpleTrainer:
 
         # self.min_sigma = self.depth * 1.0 / self.H
         # self.max_sigma = self.depth * 4.9 / self.H
-        self.min_sigma = 1
-        self.max_sigma = 5
-        print(self.min_sigma, self.max_sigma)
+        # self.min_sigma = 1
+        # self.max_sigma = 5
+        # print(self.min_sigma, self.max_sigma)
 
     # (zwx)
     def _init_gaussians(self, image_file_name):
@@ -228,10 +228,12 @@ class SimpleTrainer:
         self.current_marker = starting_size
 
         self.rho = (
-            torch.rand(self.num_points, 1, device=self.device) * 1
+            torch.rand(self.num_points, 1, device=self.device) * 0.1 + 2
         )  # (lz) start from 1
-        self.sigma_x = torch.ones(self.num_points, 1, device=self.device) * 0.5
-        self.sigma_y = torch.ones(self.num_points, 1, device=self.device) * 0.5
+
+        self.sigma_x = torch.rand(self.num_points, 1, device=self.device) * 2 - 1
+        self.sigma_y = torch.rand(self.num_points, 1, device=self.device) * 2 - 1
+
         self.opacities = torch.ones((self.num_points, 1), device=self.device) * 1
 
         self.depth = 30.0
@@ -289,10 +291,6 @@ class SimpleTrainer:
             depths, radii, conics, num_tiles_hit = project_gaussians_2D(
                 sigma_x, sigma_y, rho, self.xys.shape[0], self.depth, device=self.device
             )
-
-            if iter == 0:
-                for i in range(10):
-                    print(sigma_x[i], sigma_y[i], rho[i], radii[i])
 
             torch.cuda.synchronize()
 
@@ -375,7 +373,12 @@ class SimpleTrainer:
                 loss += self.cfg["w_code"] * loss_cos_dist
 
             if self.cfg["w_rho"] > 0:
-                loss_rho = r1r2_loss(r2 / r1)
+                # loss_rho = r1r2_loss(r2 / r1)
+                loss_rho = rho_loss(rho)
+
+                if torch.isnan(rho).any():
+                    print("rho nan")
+
                 loss += self.cfg["w_rho"] * loss_rho
 
             optimizer.zero_grad()
@@ -479,17 +482,17 @@ class SimpleTrainer:
                 rho=rho,
             )
 
-            if (iter) % 500 == 0:
-                write_to_csv_all(
-                    pixel_coords=xys,
-                    xyr=[sigma_x, sigma_y, rho],
-                    alpha=alpha,
-                    save_path=f"{out_dir}/output_all.csv",
-                    h=self.H,
-                    w=self.W,
-                    ref=self.gt_image,
-                    codebook_path=self.cfg["codebook_path"],
-                )
+            # if (iter) % 500 == 0:
+            #     write_to_csv_all(
+            #         pixel_coords=xys,
+            #         xyr=[sigma_x, sigma_y, rho],
+            #         alpha=alpha,
+            #         save_path=f"{out_dir}/output_all.csv",
+            #         h=self.H,
+            #         w=self.W,
+            #         ref=self.gt_image,
+            #         codebook_path=self.cfg["codebook_path"],
+            #     )
 
             if (iter + 1) % self.save_interval == 0:
                 torch.save(
@@ -574,8 +577,10 @@ class SimpleTrainer:
         )
 
         # cyy ：增加训练结束时写所有距离
+        xys, rho, sigma_x, sigma_y, persist_rgbs, persist_opacities = self.get_persist()
+
         write_to_csv_all(
-            pixel_coords=xys,
+            pixel_coords=absoluate_xys,
             xyr=[sigma_x, sigma_y, rho],
             alpha=alpha,
             save_path=f"{out_dir}/output_all.csv",
@@ -603,14 +608,14 @@ class SimpleTrainer:
         sigma_y,
         rho,
     ):
-        if save_imgs and iter % 100 == 0:
+        if save_imgs and iter % 500 == 0:
             # count loss for validation
             # sigma_x, sigma_y = obtain_sigma_xy(conics)
             # sigma_x, sigma_y, rho = obtain_sigma_xy_rho(conics)
 
             loss_size = size_loss(sigma_x, sigma_y, min_size=6, max_size=12)
             loss_circle = circle_loss(sigma_x, sigma_y)
-            loss_rho = rho_loss(sigma_x, sigma_y, rho)
+            loss_rho = rho_loss(rho)
 
             loss_l1 = l1_loss(out_img, self.gt_image)
             loss_mse = mse_loss(out_img, self.gt_image)
@@ -686,10 +691,10 @@ class SimpleTrainer:
             wandb.log({"view/recon": wandb.Image(view)}, step=iter)
 
     def get_persist(self):
-        xys = self.xys[self.persistent_mask]
-        rho = self.rho[self.persistent_mask]
-        sigma_x = self.sigma_x[self.persistent_mask]
-        sigma_y = self.sigma_y[self.persistent_mask]
+        xys = torch.clamp(torch.tanh(self.xys[self.persistent_mask]) * 1.02, -1, 1)
+        rho = torch.sigmoid(self.rho[self.persistent_mask])
+        sigma_x = torch.sigmoid(self.sigma_x[self.persistent_mask]) * 5
+        sigma_y = torch.sigmoid(self.sigma_y[self.persistent_mask]) * 5
         persist_rgbs = torch.sigmoid(self.rgbs[self.persistent_mask])
         persist_opacities = torch.sigmoid(self.opacities[self.persistent_mask])
 

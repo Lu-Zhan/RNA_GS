@@ -223,8 +223,8 @@ def size_loss(sigma_x, sigma_y, min_size=9.7, max_size=10.7):
     # sigma_x or sigma_y should be in a certain range of [6, 12]
     # print(sigma_x)
     # print(sigma_y)
-    loss_x = torch.relu(min_size - sigma_x).mean() + torch.relu(sigma_x - max_size).mean()
-    loss_y = torch.relu(min_size - sigma_y).mean() + torch.relu(sigma_y - max_size).mean()
+    loss_x = (torch.relu(min_size - sigma_x) ** 2).mean() + (torch.relu(sigma_x - max_size) ** 2).mean()
+    loss_y = (torch.relu(min_size - sigma_y) ** 2).mean() + (torch.relu(sigma_y - max_size) ** 2).mean()
 
     return loss_x + loss_y
 
@@ -239,16 +239,25 @@ def r1r2_loss(r1r2, min_size=0.8, max_size=1):
 
 
 #(gzx) calculate lamda1 and lamda2 for 2d gaussian
-def rho_loss(sigma_x, sigma_y, rho):
-    min_rho = 1
-    # rho should be in a range of [min_rho,1]
+def rho_loss(rho):
+    # min_rho = 1
+    # # rho should be in a range of [min_rho,1]
     
-    lamda1_times2 = (sigma_x**2 + sigma_y**2) + torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
-    lamda2_times2 = (sigma_x**2 + sigma_y**2) - torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+    # lamda1_times2 = (sigma_x**2 + sigma_y**2) + torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+    # lamda2_times2 = (sigma_x**2 + sigma_y**2) - torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
     
-    dis = (min_rho - (lamda1_times2 / (lamda2_times2 + 1e-8))) ** 2
+    # dis = (min_rho - (lamda1_times2 / (lamda2_times2 + 1e-8))) ** 2
+
+    # if torch.isnan(dis).any():
+    #     print('rho_loss nan')
+    #     print(sigma_x)
+    #     print(sigma_y)
+    #     print(rho)
+    #     print(lamda1_times2)
+    #     print(lamda2_times2)
+    #     print(dis)
     
-    return dis.mean()
+    return ((rho - 1) ** 2).mean()
 
 
 # (zwx)
