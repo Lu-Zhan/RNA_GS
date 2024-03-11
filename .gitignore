@@ -5,3 +5,5 @@ wandb/
 data/
 __pycache__
 *.out
+*.gif
+*.png

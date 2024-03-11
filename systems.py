@@ -282,7 +282,7 @@ class SimpleTrainer:
 
 
             start = time.time()
-            xys, depths, radii, conics, num_tiles_hit, cov3d = project_gaussians(
+            xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
                 persist_means,
                 persist_scales,
                 1,
