@@ -25,7 +25,6 @@ def main(
     initialization: bool = False,
     pos_score: int = 1,
     eval:bool = False,
-    vis_errormap: bool = False,
     model_path:str = None,
     weights: list[float] = [
         0,
@@ -119,17 +118,6 @@ def main(
         )
         os.environ['WANDB_MODE'] = 'offline'
         trainer.test(model_path=model_path)        
-    elif vis_errormap:
-        trainer = SimpleTrainer(
-            gt_image=gt_image,
-            primary_samples=primary_samples,
-            backup_samples=backup_samples,
-            cfg=config,
-            image_file_name=img_path,
-            densification_interval=densification_interval,
-        )
-        os.environ['WANDB_MODE'] = 'offline'
-        trainer.test_zwx(model_path=model_path) 
     else:
         trainer = SimpleTrainer(
             gt_image=gt_image,
