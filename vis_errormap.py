@@ -91,9 +91,8 @@ def read_and_vis_results(csv_path, code_book_path, img_path, model_path, pos_thr
         rgb_color_after = cmap(scorescpu[seleted_idx], bytes=True)[:, :3]
         ab_xys = (xys + 1) / 2 * H
         colors = torch.tensor(rgb_color).to(device)
-        background = torch.zeros(
-                colors.shape[-1], dtype=torch.float32, device=colors.device
-            )
+        colors_after = torch.tensor(rgb_color_after).to(device)
+        background = torch.tensor([0, 0, 1], dtype=torch.float32, device=device)
         out_img_before = rasterize_gaussians(
             ab_xys,
             depths,
@@ -113,7 +112,7 @@ def read_and_vis_results(csv_path, code_book_path, img_path, model_path, pos_thr
             radii[seleted_idx],
             conics[seleted_idx],
             num_tiles_hit,
-            colors,
+            colors_after,
             persist_opacities[seleted_idx],
             H,
             W,
