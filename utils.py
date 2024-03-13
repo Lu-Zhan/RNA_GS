@@ -17,15 +17,17 @@ from gsplat.rasterize import rasterize_gaussians
 from preprocess import images_to_tensor
 
 
-def read_codebook(path):
+def read_codebook(path, bg=False):
     df = pd.read_excel(path)
     array = (
         df.values
     )  # array(["'Acta2'", 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0], dtype=object)
 
     codebook = [np.array(x[1:], dtype=np.float32) for x in array]
+    if bg:
+        codebook = [np.zeros(15, dtype=np.float32)] + codebook
 
-    return np.stack(codebook, axis=0)  # (181, 15)
+    return np.stack(codebook, axis=0)  # (181/182, 15)
 
 
 def read_codebook_name(path):

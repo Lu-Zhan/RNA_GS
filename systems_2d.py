@@ -11,7 +11,7 @@ from gsplat.rasterize import rasterize_gaussians
 
 from losses import *
 from visualize import view_output
-from utils import calculate_mdp_psnr
+from utils import calculate_mdp_psnr, read_codebook
 from models import GaussModel
 
 
@@ -36,6 +36,9 @@ class GSSystem(LightningModule):
             device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
         )
 
+        self.codebook = read_codebook(self.hparams['data']['codebook_path'], bg=True)
+        self.codebook = torch.tensor(self.codebook, device=self.gs_model.means_3d.device)
+
     def configure_optimizers(self):
         optimizer = optim.Adam(self.gs_model.parameters, lr=self.hparams['train']['lr'])
         return optimizer
@@ -57,7 +60,9 @@ class GSSystem(LightningModule):
             self.log_step("train/loss_l2", loss_l2)
         
         if self.hparams['loss']['w_mi'] > 0:
-            loss_mi = mi_loss(output, batch)
+            pred_code = torch.sigmoid(self.gs_model.rgbs) * torch.sigmoid(self.gs_model.opacities)
+            loss_mi = mi_loss(pred_code, self.codebook)
+            
             loss += self.hparams['loss']['w_mi'] * loss_mi
             self.log_step("train/loss_mi", loss_l1)
         
