@@ -29,8 +29,7 @@ class GSSystem(LightningModule):
         os.makedirs(os.path.join(self.save_folder, "epoch"), exist_ok=True)
 
         self.frames = []
-    
-    def prepare_data(self):
+
         self.gs_model = GaussModel(
             num_points=self.hparams['train']['num_samples'], 
             hw=self.hparams['hw'],
@@ -97,8 +96,8 @@ class GSSystem(LightningModule):
         mean_mse = torch.mean((output - batch) ** 2).cpu()
         mean_psnr = float(10 * torch.log10(1 / mean_mse))
         mdp_psnr = calculate_mdp_psnr(output, batch)
-        self.log_step('val/mean_psnr', mean_psnr, prog_bar=True)
-        self.log_step('val/mdp_psnr', mdp_psnr)
+        self.log_step('val/mean_psnr', mean_psnr, on_step=False, on_epoch=True, prog_bar=True)
+        self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
         # visualization
         view = view_output(pred=output, gt=batch)
@@ -112,6 +111,29 @@ class GSSystem(LightningModule):
             frames = [Image.fromarray(x) for x in self.frames]
             save_path = os.path.join(self.save_folder, "training.gif")
             frames[0].save(save_path, save_all=True, append_images=frames[1:], optimize=False, duration=5, loop=0)
+
+        return mean_psnr
+
+    # def on_validation_epoch_end(self, mean_psnr):
+    #     self.log_step('val/mean_psnr', self.val_psnr, prog_bar=True)
+
+    def predict_step(self, batch, batch_idx):
+        batch = batch[0]
+        output = self.forward()
+
+        # metric
+        mean_mse = torch.mean((output - batch) ** 2).cpu()
+        mean_psnr = float(10 * torch.log10(1 / mean_mse))
+        mdp_psnr = calculate_mdp_psnr(output, batch)
+        print('mean_psnr', mean_psnr, 'mdp_psnr', mdp_psnr)
+
+        # visualization
+        view = view_output(pred=output, gt=batch)
+        view = Image.fromarray(view)
+
+        view.save(os.path.join(self.save_folder, f"recon.png"))
+
+        return
 
     def forward(self):
         xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
@@ -148,6 +170,8 @@ class GSSystem(LightningModule):
 
         return out_img
 
+    def on_save_checkpoint(self, checkpoint):
+        checkpoint['gs_model'] = self.gs_model
 
-
-
+    def on_load_checkpoint(self, checkpoint):
+        self.gs_model = checkpoint['gs_model']

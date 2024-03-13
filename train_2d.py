@@ -77,8 +77,12 @@ def main():
     # checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         dirpath=ckpt_path,
-        filename='epoch-{epoch}',
+        filename='psnr={val/mean_psnr:.4f}',
         save_last=True,
+        save_top_k=1,
+        monitor='val/mean_psnr',
+        auto_insert_metric_name=False,
+        mode='max',
     )
 
     # model & dataloader
@@ -112,6 +116,8 @@ def main():
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader,
     )
+
+    trainer.predict(model=gs_system, dataloaders=val_dataloader)
 
 
 if __name__ == "__main__":

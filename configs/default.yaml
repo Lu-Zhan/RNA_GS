@@ -1,8 +1,8 @@
-exp_name: masked_l1_full_l2
+exp_name: masked_l1_full_l2_lr=-4e-3
 
 train:
-  lr: 0.005
-  iterations: 50000
+  lr: 0.004
+  iterations: 10000
   num_samples: 8000
   tile_size: 16
 

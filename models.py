@@ -2,8 +2,9 @@ import math
 import torch
 
 
-class GaussModel(object):
-    def __init__(self, num_points, hw, device) -> None:
+class GaussModel(torch.nn.Module):
+    def __init__(self, num_points, hw, device):
+        super(GaussModel, self).__init__()
         self._init_gaussians(num_points, device)
         self.zero_z = torch.zeros(num_points, 1, device=device)
 
