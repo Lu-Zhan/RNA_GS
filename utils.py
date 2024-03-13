@@ -495,7 +495,7 @@ def read_and_vis_results(csv_path,img_path,pos_threshold=20):
     )
 
 # (zwx) PSNR after maximum density projection
-def MDP_recon_psnr(img, gt_img):
+def calculate_mdp_psnr(img, gt_img):
     MDP_img = img.max(axis = 2).values
     MDP_gt_img = gt_img.max(axis = 2).values
     mse_loss = torch.nn.MSELoss()

@@ -11,6 +11,19 @@ mse_loss = torch.nn.MSELoss()
 sl1_loss = torch.nn.SmoothL1Loss()
 
 
+def mi_loss(pred_code, codebook):
+    simi = pred_code @ codebook.T  # (num_samples, 15) @ (15, 181) = (num_samples, 181)
+
+    simi = simi / (torch.norm(pred_code, dim=-1, keepdim=True) * torch.norm(codebook, dim=-1, keepdim=True).T + 1e-8)
+
+    min_dist = 1 - simi.max(dim=-1, keepdim=True)[0]  # (num_samples, 1)
+    all_dist = 1 - simi(dim=-1) # (num_samples, 181)
+
+    loss = - torch.log(torch.exp(min_dist) / (torch.exp(all_dist).sum(dim=-1, keepdim=True) - torch.exp(min_dist) + 1e-8))
+
+    return loss.mean()
+
+
 def masked_l1_loss(input, target):
     mask = target > 0
 
@@ -23,7 +36,12 @@ def masked_mse_loss(input, target):
     return ((input * mask - target * mask) ** 2).sum() / (mask.sum() + 1e-8)
 
 
-def bg_loss(input, target):
+def bg_l1_loss(input, target):
+    mask = target == 0
+    return ((input * mask).abs()).sum() / (mask.sum() + 1e-8)
+
+
+def bg_mse_loss(input, target):
     mask = target == 0
     return ((input * mask) ** 2).sum() / (mask.sum() + 1e-8)
 

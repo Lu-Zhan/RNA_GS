@@ -38,7 +38,7 @@ from utils import (
     write_to_csv_all,
     write_to_csv_hamming,
     read_codebook,
-    MDP_recon_psnr,
+    calculate_mdp_psnr,
 )
 
 from preprocess import preprocess_data, give_required_data
@@ -584,7 +584,7 @@ class SimpleTrainer:
             mean_mse = torch.mean((out_img - self.gt_image) ** 2).cpu()
             mean_psnr = float(10 * torch.log10(1 / mean_mse))
             # (zwx) mpd_psnr
-            mdp_psnr = MDP_recon_psnr(out_img, self.gt_image)
+            mdp_psnr = mdp_psnr(out_img, self.gt_image)
             print(
                 f"Iter {iter + 1}/{iterations}, N:{persist_rgbs.shape[0]}, Ll2: {loss_mse:.7f}, Lml2: {loss_masked_mse:.7f}, Lssim: {loss_ssim:.7f}, mPSNR: {mean_psnr:.2f}, mdpPSNR: {mdp_psnr:.2f}"
             )

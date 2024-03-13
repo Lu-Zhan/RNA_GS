@@ -1,0 +1,24 @@
+exp_name: masked_l1_full_l2
+
+train:
+  lr: 0.005
+  iterations: 50000
+  num_samples: 8000
+  tile_size: 16
+
+loss:
+  w_l1: 0
+  w_l2: 1
+  w_mi: 0
+  w_masked_l2: 0
+  w_bg_l2: 0
+  w_masked_l1: 1
+  w_bg_l1: 1
+
+data:
+  data_path: ../data/IM41340_tiled/1_36
+  codebook_path: ../data/1213_demo_data_v2/codebook.xlsx
+
+model:
+  checkpoint_path: checkpoints
+  save_gif: 0
