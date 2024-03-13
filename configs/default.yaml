@@ -14,6 +14,8 @@ loss:
   w_bg_l2: 0
   w_masked_l1: 1
   w_bg_l1: 1
+  w_rho: 0
+  w_radius: 0
 
 data:
   data_path: ../data/IM41340_tiled/1_36

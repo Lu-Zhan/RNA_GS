@@ -42,7 +42,7 @@ class GSSystem(LightningModule):
 
     def training_step(self, batch, batch_idx):
         batch = batch[0]
-        output = self.forward()
+        output, conics, radii = self.forward()
 
         loss = 0.
 
@@ -80,6 +80,16 @@ class GSSystem(LightningModule):
             loss_bg_l1 = bg_l1_loss(output, batch)
             loss += self.hparams['loss']['w_bg_l1'] * loss_bg_l1
             self.log_step("train/loss_bg_l1", loss_bg_l1)
+        
+        if self.hparams['loss']['w_rho'] > 0:
+            loss_rho = rho_loss(conics)
+            loss += self.hparams['loss']['w_rho'] * loss_rho
+            self.log_step("train/loss_rho", loss_rho)
+        
+        if self.hparams['loss']['w_radius'] > 0:
+            loss_radius = radius_loss(radii)
+            loss += self.hparams['loss']['w_radius'] * loss_radius
+            self.log_step("train/loss_radius", loss_radius)
 
         self.log_step("train/total_loss", loss, prog_bar=True)
 
@@ -90,7 +100,7 @@ class GSSystem(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         batch = batch[0]
-        output = self.forward()
+        output, _, _ = self.forward()
 
         # metric
         mean_mse = torch.mean((output - batch) ** 2).cpu()
@@ -114,12 +124,9 @@ class GSSystem(LightningModule):
 
         return mean_psnr
 
-    # def on_validation_epoch_end(self, mean_psnr):
-    #     self.log_step('val/mean_psnr', self.val_psnr, prog_bar=True)
-
     def predict_step(self, batch, batch_idx):
         batch = batch[0]
-        output = self.forward()
+        output, _, _ = self.forward()
 
         # metric
         mean_mse = torch.mean((output - batch) ** 2).cpu()
@@ -168,7 +175,7 @@ class GSSystem(LightningModule):
         )
         # torch.cuda.synchronize()
 
-        return out_img
+        return out_img, conics, radii
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint['gs_model'] = self.gs_model

@@ -46,6 +46,42 @@ def bg_mse_loss(input, target):
     return ((input * mask) ** 2).sum() / (mask.sum() + 1e-8)
 
 
+#(gzx, updated by lz)
+def obtain_sigma_xy_rho(conics):
+    # conics is a tensor of shape (N, 3), inverse covariance matrix in upper triangular format, whose unit is pixel
+    # recover to covariance matrix
+    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
+    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
+
+    cov = torch.inverse(inv_cov)    # (N, 2, 2)
+
+    sigma_x = torch.sqrt(cov[:, 0, 0])    # (N, )
+    sigma_y = torch.sqrt(cov[:, 1, 1])    # (N, )
+    # rho = torch.sqrt((cov[:, 0, 1] * cov[:, 1, 0]) / (cov[:, 0, 0] * cov[:, 1, 1]))
+    rho = cov[:, 0, 1] / (sigma_x * sigma_y)    # r*s_x*s_y / (s_x * s_y) = r
+
+    return sigma_x, sigma_y, rho
+
+# (lz)
+def rho_loss(conics):
+    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
+    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
+
+    cov = torch.inverse(inv_cov)    # (N, 2, 2)
+    rho_2 = (cov[:, 0, 1] * cov[:, 1, 0]) / (cov[:, 0, 0] * cov[:, 1, 1])
+
+    return rho_2.mean()
+
+# (lz)
+def radius_loss(radii, range=[2, 6]):
+    loss_small = (torch.relu(range[0] - radii)).mean() 
+    loss_big = (torch.relu(radii - range[0])).mean()
+
+    return loss_small + loss_big
+
+
+
+
 def bright_loss(input, target):
     mask_input = input > 0
     mask_target = target > 0
@@ -212,21 +248,6 @@ def obtain_sigma_xy(conics):
 
     return sigma_x, sigma_y
 
-#(gzx)
-def obtain_sigma_xy_rho(conics):
-    # conics is a tensor of shape (N, 3), inverse covariance matrix in upper triangular format, whose unit is pixel
-    # recover to covariance matrix
-    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
-    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
-
-    cov = torch.inverse(inv_cov)    # (N, 2, 2)
-
-    sigma_x = torch.sqrt(cov[:, 0, 0])    # (N, )
-    sigma_y = torch.sqrt(cov[:, 1, 1])    # (N, )
-    rho     = torch.sqrt((cov[:, 0, 1]*cov[:, 1, 0])/(cov[:, 0, 0]*cov[:, 1, 1]))
-
-    return sigma_x, sigma_y, rho
-
 
 # (lz) circle loss for 2D gaussian kernal
 def circle_loss(sigma_x, sigma_y):
@@ -247,17 +268,17 @@ def size_loss(sigma_x, sigma_y, min_size=9.7, max_size=10.7):
     return loss_x + loss_y
 
 
-#(gzx) calculate lamda1 and lamda2 for 2d gaussian
-def rho_loss(sigma_x, sigma_y, rho):
-    min_rho = 1
-    # rho should be in a range of [min_rho,1]
+# #(gzx) calculate lamda1 and lamda2 for 2d gaussian
+# def rho_loss(sigma_x, sigma_y, rho):
+#     min_rho = 1
+#     # rho should be in a range of [min_rho,1]
     
-    lamda1_times2 = (sigma_x**2 + sigma_y**2) + torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
-    lamda2_times2 = (sigma_x**2 + sigma_y**2) - torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+#     lamda1_times2 = (sigma_x**2 + sigma_y**2) + torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
+#     lamda2_times2 = (sigma_x**2 + sigma_y**2) - torch.sqrt(((sigma_x**2 + sigma_y**2))**2 - 4 * (1 - rho**2) * ((sigma_x * sigma_y)**2))
     
-    dis = (min_rho - (lamda1_times2 / lamda2_times2)) ** 2
+#     dis = (min_rho - (lamda1_times2 / lamda2_times2)) ** 2
     
-    return dis.mean()
+#     return dis.mean()
 
 
 # (zwx)
