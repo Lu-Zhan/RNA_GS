@@ -8,3 +8,5 @@ __pycache__
 *.gif
 *.png
 lightning_logs/
+test/
+archive/

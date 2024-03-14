@@ -5,7 +5,7 @@ import logging
 logging.getLogger('lightning').setLevel(0)
 
 from pathlib import Path
-from argparse import ArgumentParser
+from argparse import ArgumentParser, REMAINDER
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
@@ -23,17 +23,10 @@ def main():
     parser.add_argument("--config", type=str, default='configs/default.yaml')
     parser.add_argument("--exp_name", type=str, default='')
     parser.add_argument("--exp_dir", type=str, default='outputs/')
+    parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
-
-    with open(args.config, "r") as f:
-        config = yaml.safe_load(f)
     
-    config['devices'] = args.devices
-    config['config'] = args.config
-    config['exp_dir'] = args.exp_dir
-
-    if args.exp_name != '':
-        config['exp_name'] = args.exp_name
+    config = obtain_config(args)
 
     # fix seed
     seed_everything(42)
@@ -94,7 +87,37 @@ def main():
         val_dataloaders=val_dataloader,
     )
 
-    # trainer.predict(model=gs_system, dataloaders=val_dataloader)
+    trainer.predict(model=gs_system, dataloaders=val_dataloader)
+
+
+def obtain_config(args):
+    with open(args.config, "r") as f:
+        config = yaml.safe_load(f)
+
+    config['devices'] = args.devices
+    config['config'] = args.config
+    config['exp_dir'] = args.exp_dir
+
+    keys = args.extra[::2]
+    values = args.extra[1::2]
+
+    for k, v in zip(keys, values):
+        kk = k.split('.')
+
+        try:
+            v = float(v)
+        except:
+            pass
+
+        if len(kk) == 2:
+            config[kk[0]][kk[1]] = v
+        else:
+            config[kk[0]] = v
+        
+    if args.exp_name != '':
+        config['exp_name'] = args.exp_name
+
+    return config
 
 
 if __name__ == "__main__":

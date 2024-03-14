@@ -7,14 +7,16 @@ from torch.utils.data import Dataset
 class RNADataset(Dataset):
     def __init__(self, hparams, mode='train', rescale=True):  
         path = Path(hparams['data']['data_path'])
+
         try:
             self.gt_image, self.range = images_to_tensor(path)
+            print
         except:
             self.gt_image, self.range = images_to_tensor_cropped(path)
         
         # self.gt_image = torch.repeat_interleave(self.gt_image[..., 0:1], 15, dim=2)
 
-        # self.gt_image = self.gt_image ** 0.5
+        self.gt_image = self.gt_image ** 0.5
 
         self.num_iters = hparams['train']['iterations']
         self.mode = mode
@@ -42,16 +44,17 @@ def images_to_tensor(image_path: Path):
     image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
 
     images = []
+    transform = transforms.ToTensor()
 
     for image_path in image_paths:
         img = Image.open(image_path)
-        transform = transforms.ToTensor()
         img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
         images.append(img_tensor)
 
     imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
     imgs_tensor = torch.log10(imgs_tensor + 1) / torch.log10(torch.tensor([2801])) # [h,w,15]
-    imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
+    # imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
+    # imgs_tensor = torch.cat(images, dim=2) / 255. # [h, w, 15]
 
     min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
     imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)

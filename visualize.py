@@ -3,15 +3,18 @@ import matplotlib.pyplot as plt
 
 from torch.nn.functional import interpolate
 
-def view_output(pred, gt):
+def view_output(pred, gt, resize=(192, 192)):
     # view pred and gt images in 15 groups.
     # for each group, pred on left, gt on right, pred: [h, w, 15], gt: [h, w, 15], using heatmap
     # resize to 192 x 192
-    pred = interpolate(pred.permute(2, 0, 1)[None, ...], size=(192, 192), mode="bilinear", align_corners=False)
-    gt = interpolate(gt.permute(2, 0, 1)[None, ...], size=(192, 192), mode="bilinear", align_corners=False)
+    pred = interpolate(pred.permute(2, 0, 1)[None, ...], size=resize, mode="bilinear", align_corners=False)
+    gt = interpolate(gt.permute(2, 0, 1)[None, ...], size=resize, mode="bilinear", align_corners=False)
 
-    pred = pred[0].permute(1, 2, 0).detach().cpu().numpy()
-    gt = gt[0].permute(1, 2, 0).detach().cpu().numpy()
+    pred = pred[0].permute(1, 2, 0)
+    gt = gt[0].permute(1, 2, 0)
+    
+    pred = pred.detach().cpu().numpy()
+    gt = gt.detach().cpu().numpy()
 
     fig, axs = plt.subplots(6, 5, figsize=(15, 15))
     # plt.subplots_adjust(top=1, bottom=0, left=0, right=1, wspace=0, hspace=0)

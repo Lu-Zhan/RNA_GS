@@ -140,13 +140,13 @@ class GSSystem(LightningModule):
         mean_mse = torch.mean((output - batch) ** 2).cpu()
         mean_psnr = float(10 * torch.log10(1 / mean_mse))
         mdp_psnr = calculate_mdp_psnr(output, batch)
-        print('mean_psnr', mean_psnr, 'mdp_psnr', mdp_psnr)
+        print(f'mean_psnr: {mean_psnr:.4f}, mdp_psnr: {mdp_psnr:.4f}')
 
         # visualization
-        # view = view_output(pred=output, gt=batch)
         view = view_output(
             pred=self._original(output), 
             gt=self._original(batch),
+            resize=(384, 384),
         )
         view = Image.fromarray(view)
 
