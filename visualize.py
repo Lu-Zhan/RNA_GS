@@ -1,15 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from PIL import Image
 from torch.nn.functional import interpolate
 
 
 def view_positions(points_xy, bg_image, alpha=1):
-    # points_xy: [n, 2], bg_image: [h, w, 1]
+    # points_xy: [n, 2], bg_image: [h, w, 1], alpha: [n, 15]
     
     # select points within the image
     mask = (points_xy[:, 0] >= 0) & (points_xy[:, 0] < bg_image.shape[1]) & (points_xy[:, 1] >= 0) & (points_xy[:, 1] < bg_image.shape[0])
     points_xy = points_xy[mask]
+
+    alpha = alpha[mask]
+    alpha = np.max(alpha, axis=-1)
+    alpha = alpha / (alpha.max() + 1e-8)
 
     fig, ax = plt.subplots()
     ax.imshow(bg_image, cmap="gray")
@@ -28,7 +33,7 @@ def view_positions(points_xy, bg_image, alpha=1):
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
     plt.close()
 
-    return data
+    return Image.fromarray(data)
 
 
 def view_recon(pred, gt, resize=(192, 192)):

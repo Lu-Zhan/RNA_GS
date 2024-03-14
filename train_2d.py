@@ -87,6 +87,7 @@ def main():
         val_dataloaders=val_dataloader,
     )
 
+    gs_system.load_from_checkpoint(checkpoint_callback.best_model_path)
     trainer.predict(model=gs_system, dataloaders=val_dataloader)
 
 

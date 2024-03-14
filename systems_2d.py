@@ -63,7 +63,7 @@ class GSSystem(LightningModule):
             self.log_step("train/loss_l2", loss_l2)
         
         if self.hparams['loss']['w_mi'] > 0:
-            pred_code = torch.sigmoid(self.gs_model.rgbs) * torch.sigmoid(self.gs_model.opacities)
+            pred_code = self.pred_color
             loss_mi = mi_loss(pred_code, self.codebook)
 
             loss += self.hparams['loss']['w_mi'] * loss_mi
@@ -130,13 +130,24 @@ class GSSystem(LightningModule):
             self.logger.experiment.log({"val_image": [wandb.Image(recon_image, caption="val_image")]}, step=self.global_step)
         
         if self.global_step % 10000 == 0:
-            position_image = view_positions(
+            position_on_dapi_image = view_positions(
                 points_xy=xys.detach().cpu().numpy(), 
                 bg_image=self.mdp_dapi_image.cpu().numpy(),
+                alpha=self.pred_color.cpu().numpy(),
             )
-            position_image = Image.fromarray(position_image)
-            position_image.save(os.path.join(self.save_folder, f"positions.png"))
-            self.logger.experiment.log({"positions": [wandb.Image(position_image, caption="positions")]})
+            position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
+
+            position_on_mdp_image = view_positions(
+                points_xy=xys.detach().cpu().numpy(), 
+                bg_image=batch.max(dim=-1)[0].cpu().numpy(),
+                alpha=self.pred_color.cpu().numpy(),
+            )
+            position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
+
+            self.logger.experiment.log({"positions": [
+                wandb.Image(position_on_dapi_image, caption="dapi"),
+                wandb.Image(position_on_mdp_image, caption="mdp"),
+            ]})
 
         if self.hparams['model']['save_gif'] == 1 and self.global_step == self.hparams['train']['iterations']:
             frames = [Image.fromarray(x) for x in self.frames]
@@ -165,15 +176,25 @@ class GSSystem(LightningModule):
 
         recon_image.save(os.path.join(self.save_folder, f"recon.png"))
 
-        position_image = view_positions(
+        position_on_dapi_image = view_positions(
             points_xy=xys.detach().cpu().numpy(), 
             bg_image=self.mdp_dapi_image.cpu().numpy(),
+            alpha=self.pred_color.cpu().numpy(),
         )
-        position_image = Image.fromarray(position_image)
-        position_image.save(os.path.join(self.save_folder, f"positions.png"))
+        position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
+
+        position_on_mdp_image = view_positions(
+            points_xy=xys.detach().cpu().numpy(), 
+            bg_image=batch.max(dim=-1)[0].cpu().numpy(),
+            alpha=self.pred_color.cpu().numpy(),
+        )
+        position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
         
         try:
-            self.logger.experiment.log({"positions": [wandb.Image(position_image, caption="positions")]})
+            self.logger.experiment.log({"positions": [
+                wandb.Image(position_on_dapi_image, caption="dapi"),
+                wandb.Image(position_on_mdp_image, caption="mdp"),
+            ]})
         except:
             print("wandb not available")
 
@@ -224,3 +245,7 @@ class GSSystem(LightningModule):
 
     def _original(self, x):
         return x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
+    
+    @property
+    def pred_color(self):
+        return torch.sigmoid(self.gs_model.rgbs) * torch.sigmoid(self.gs_model.opacities)

@@ -1,8 +1,8 @@
 exp_name: test_384_lr=4e-3
 
 train:
-  lr: 0.004
-  iterations: 10000
+  lr: 0.005
+  iterations: 20000
   num_samples: 8000
   tile_size: 16
 
