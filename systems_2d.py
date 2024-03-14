@@ -62,13 +62,6 @@ class GSSystem(LightningModule):
             loss += self.hparams['loss']['w_l2'] * loss_l2
             self.log_step("train/loss_l2", loss_l2)
         
-        if self.hparams['loss']['w_mi'] > 0:
-            pred_code = self.pred_color
-            loss_mi = mi_loss(pred_code, self.codebook)
-
-            loss += self.hparams['loss']['w_mi'] * loss_mi
-            self.log_step("train/loss_mi", loss_l1)
-        
         if self.hparams['loss']['w_masked_l2'] > 0:
             loss_masked_l2 = masked_mse_loss(output, batch)
             loss += self.hparams['loss']['w_masked_l2'] * loss_masked_l2
@@ -98,6 +91,13 @@ class GSSystem(LightningModule):
             loss_radius = radius_loss(radii)
             loss += self.hparams['loss']['w_radius'] * loss_radius
             self.log_step("train/loss_radius", loss_radius)
+        
+        if self.hparams['loss']['w_mi'] > 0:
+            pred_code = self.pred_color
+            loss_mi = mi_loss(pred_code, self.codebook)
+
+            loss += self.hparams['loss']['w_mi'] * loss_mi
+            self.log_step("train/loss_mi", loss_mi)
 
         self.log_step("train/total_loss", loss, prog_bar=True)
 

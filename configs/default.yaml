@@ -1,4 +1,4 @@
-exp_name: test_384_lr=4e-3
+exp_name: test_384_mi=5e-3
 
 train:
   lr: 0.005
@@ -9,13 +9,13 @@ train:
 loss:
   w_l1: 0
   w_l2: 1
-  w_mi: 0
   w_masked_l2: 0
   w_bg_l2: 0
   w_masked_l1: 1
   w_bg_l1: 1
   w_rho: 0
   w_radius: 0
+  w_mi: 0.005
 
 data:
   # data_path: ../data/IM41340_full/IM41340regi
