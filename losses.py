@@ -65,11 +65,11 @@ def rho_loss(conics):
     return rho_2.mean()
 
 
-def radius_loss(radii, range=[2, 6]):
-    loss_small = (torch.relu(range[0] - radii)).mean() 
-    loss_big = (torch.relu(radii - range[0])).mean()
+def radius_loss(radii, range=[2, 4]):
+    # loss_small = (torch.relu(range[0] - radii) ** 2).mean()
+    loss_big = (torch.relu(radii - range[0]) ** 2).mean()
 
-    return loss_small + loss_big
+    return loss_big
 
 
 if __name__ == '__main__':

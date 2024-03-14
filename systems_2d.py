@@ -40,7 +40,10 @@ class GSSystem(LightningModule):
         self.codebook = torch.tensor(self.codebook, device=self.gs_model.means_3d.device)
 
         self.dapi_images = kwargs.get('dapi_images', None)
-        self.mdp_dapi_image = self.dapi_images.max(dim=-1)[0]
+        try:
+            self.mdp_dapi_image = self.dapi_images.max(dim=-1)[0]
+        except:
+            print("dapi_images not available, read from checkpoint")
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.gs_model.parameters, lr=self.hparams['train']['lr'])
@@ -88,7 +91,7 @@ class GSSystem(LightningModule):
             self.log_step("train/loss_rho", loss_rho)
         
         if self.hparams['loss']['w_radius'] > 0:
-            loss_radius = radius_loss(radii)
+            loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
             loss += self.hparams['loss']['w_radius'] * loss_radius
             self.log_step("train/loss_radius", loss_radius)
         
@@ -100,6 +103,7 @@ class GSSystem(LightningModule):
             self.log_step("train/loss_mi", loss_mi)
 
         self.log_step("train/total_loss", loss, prog_bar=True)
+        self.log_step("train/", self.trainer.optimizers[0].param_groups[0]['lr'], prog_bar=True)
 
         return loss
 
