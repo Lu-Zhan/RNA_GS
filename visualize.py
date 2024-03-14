@@ -3,7 +3,35 @@ import matplotlib.pyplot as plt
 
 from torch.nn.functional import interpolate
 
-def view_output(pred, gt, resize=(192, 192)):
+
+def view_positions(points_xy, bg_image, alpha=1):
+    # points_xy: [n, 2], bg_image: [h, w, 1]
+    
+    # select points within the image
+    mask = (points_xy[:, 0] >= 0) & (points_xy[:, 0] < bg_image.shape[1]) & (points_xy[:, 1] >= 0) & (points_xy[:, 1] < bg_image.shape[0])
+    points_xy = points_xy[mask]
+
+    fig, ax = plt.subplots()
+    ax.imshow(bg_image, cmap="gray")
+    ax.scatter(points_xy[:, 0], points_xy[:, 1], c="r", s=1, alpha=alpha)
+    ax.axis("off")
+    plt.title(f"Points: {len(points_xy)}")
+
+    plt.tight_layout()
+    plt.subplots_adjust(
+        left=0.05, bottom=0.05, right=0.95, top=0.95, wspace=0.05, hspace=0.15
+    )
+    fig.canvas.draw()
+
+    # Now we can save it to a numpy array.
+    data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+    plt.close()
+
+    return data
+
+
+def view_recon(pred, gt, resize=(192, 192)):
     # view pred and gt images in 15 groups.
     # for each group, pred on left, gt on right, pred: [h, w, 15], gt: [h, w, 15], using heatmap
     # resize to 192 x 192

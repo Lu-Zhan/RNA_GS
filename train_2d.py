@@ -63,7 +63,7 @@ def main():
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range
-    gs_system = GSSystem(hparams=config)
+    gs_system = GSSystem(hparams=config, dapi_images=train_dataset.dapi_images)
 
     trainer = Trainer(
         benchmark=True,

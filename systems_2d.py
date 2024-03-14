@@ -10,14 +10,14 @@ from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
 from losses import *
-from visualize import view_output
+from visualize import view_recon, view_positions
 from utils import calculate_mdp_psnr, read_codebook
 from models import GaussModel
 
 
 ''' system '''
 class GSSystem(LightningModule):
-    def __init__(self, hparams):  
+    def __init__(self, hparams, **kwargs):  
         super().__init__()
 
         self.save_hyperparameters(hparams)
@@ -39,13 +39,16 @@ class GSSystem(LightningModule):
         self.codebook = read_codebook(self.hparams['data']['codebook_path'], bg=True)
         self.codebook = torch.tensor(self.codebook, device=self.gs_model.means_3d.device)
 
+        self.dapi_images = kwargs.get('dapi_images', None)
+        self.mdp_dapi_image = self.dapi_images.max(dim=-1)[0]
+
     def configure_optimizers(self):
         optimizer = optim.Adam(self.gs_model.parameters, lr=self.hparams['train']['lr'])
         return optimizer
 
     def training_step(self, batch, batch_idx):
         batch = batch[0]
-        output, conics, radii = self.forward()
+        output, conics, radii, _ = self.forward()
 
         loss = 0.
 
@@ -105,7 +108,7 @@ class GSSystem(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         batch = batch[0]
-        output, _, _ = self.forward()
+        output, _, _, xys = self.forward()
 
         # metric
         mean_mse = torch.mean((output - batch) ** 2).cpu()
@@ -115,15 +118,25 @@ class GSSystem(LightningModule):
         self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
         # visualization
-        view = view_output(
+        recon_image = view_recon(
             pred=self._original(output), 
             gt=self._original(batch),
         )
-        view = Image.fromarray(view)
-        self.frames.append(view)
+        recon_image = Image.fromarray(recon_image)
+        self.frames.append(recon_image)
+        recon_image.save(os.path.join(self.save_folder, "epoch", f"epoch_{self.global_step:05d}.png"))
 
-        view.save(os.path.join(self.save_folder, "epoch", f"epoch_{self.global_step:05d}.png"))
-        self.logger.experiment.log({"val_image": [wandb.Image(view, caption="val_image")]}, step=self.global_step)
+        if self.global_step % 5000 == 0:
+            self.logger.experiment.log({"val_image": [wandb.Image(recon_image, caption="val_image")]}, step=self.global_step)
+        
+        if self.global_step % 10000 == 0:
+            position_image = view_positions(
+                points_xy=xys.detach().cpu().numpy(), 
+                bg_image=self.mdp_dapi_image.cpu().numpy(),
+            )
+            position_image = Image.fromarray(position_image)
+            position_image.save(os.path.join(self.save_folder, f"positions.png"))
+            self.logger.experiment.log({"positions": [wandb.Image(position_image, caption="positions")]})
 
         if self.hparams['model']['save_gif'] == 1 and self.global_step == self.hparams['train']['iterations']:
             frames = [Image.fromarray(x) for x in self.frames]
@@ -134,7 +147,7 @@ class GSSystem(LightningModule):
 
     def predict_step(self, batch, batch_idx):
         batch = batch[0]
-        output, _, _ = self.forward()
+        output, _, _, xys = self.forward()
 
         # metric
         mean_mse = torch.mean((output - batch) ** 2).cpu()
@@ -143,16 +156,28 @@ class GSSystem(LightningModule):
         print(f'mean_psnr: {mean_psnr:.4f}, mdp_psnr: {mdp_psnr:.4f}')
 
         # visualization
-        view = view_output(
+        recon_image = view_recon(
             pred=self._original(output), 
             gt=self._original(batch),
             resize=(384, 384),
         )
-        view = Image.fromarray(view)
+        recon_image = Image.fromarray(recon_image)
 
-        view.save(os.path.join(self.save_folder, f"recon.png"))
+        recon_image.save(os.path.join(self.save_folder, f"recon.png"))
 
-        return
+        position_image = view_positions(
+            points_xy=xys.detach().cpu().numpy(), 
+            bg_image=self.mdp_dapi_image.cpu().numpy(),
+        )
+        position_image = Image.fromarray(position_image)
+        position_image.save(os.path.join(self.save_folder, f"positions.png"))
+        
+        try:
+            self.logger.experiment.log({"positions": [wandb.Image(position_image, caption="positions")]})
+        except:
+            print("wandb not available")
+
+        return None
 
     def forward(self):
         xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
@@ -187,13 +212,15 @@ class GSSystem(LightningModule):
         )
         # torch.cuda.synchronize()
 
-        return out_img, conics, radii
+        return out_img, conics, radii, xys
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint['gs_model'] = self.gs_model
+        checkpoint['mdp_dapi_image'] = self.mdp_dapi_image
 
     def on_load_checkpoint(self, checkpoint):
         self.gs_model = checkpoint['gs_model']
+        self.mdp_dapi_image = checkpoint['mdp_dapi_image']
 
     def _original(self, x):
         return x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]

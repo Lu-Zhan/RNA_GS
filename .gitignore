@@ -10,3 +10,4 @@ __pycache__
 lightning_logs/
 test/
 archive/
+.vscode/
