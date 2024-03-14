@@ -1,4 +1,4 @@
-exp_name: masked_l1_full_l2_lr=-4e-3
+exp_name: ori_full
 
 train:
   lr: 0.004
@@ -19,7 +19,7 @@ loss:
 
 data:
   data_path: ../data/IM41340_tiled/1_36
-  codebook_path: ../data/1213_demo_data_v2/codebook.xlsx
+  codebook_path: ../data/codebook.xlsx
 
 model:
   checkpoint_path: checkpoints

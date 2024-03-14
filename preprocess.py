@@ -89,7 +89,10 @@ def images_to_tensor(image_path: Path):
     imgs_tensor = torch.log10(imgs_tensor + 1) / torch.log10(torch.tensor([2801])) # [h,w,15]
     imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
 
-    return imgs_tensor
+    min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
+    imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
+
+    return imgs_tensor, min_value, max_value
 
 def images_to_tensor_cropped(image_path: Path):
     import torchvision.transforms as transforms
@@ -105,8 +108,10 @@ def images_to_tensor_cropped(image_path: Path):
         images.append(img_tensor)
 
     imgs_tensor = torch.cat(images, dim=2) / 255. # [h, w, 15]
+    min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
+    imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
 
-    return imgs_tensor
+    return imgs_tensor, min_value, max_value
 
 
 

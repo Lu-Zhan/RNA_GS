@@ -9,37 +9,13 @@ from argparse import ArgumentParser
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 from systems_2d import GSSystem
-from preprocess import images_to_tensor, images_to_tensor_cropped
+from datasets import RNADataset
 
 torch.set_float32_matmul_precision('medium')
 
-class RNADataset(Dataset):
-    def __init__(self, hparams, mode='train'):  
-        path = Path(hparams['data']['data_path'])
-        try:
-            self.gt_image = images_to_tensor(path)
-        except:
-            self.gt_image = images_to_tensor_cropped(path)
-        
-        self.num_iters = hparams['train']['iterations']
-        self.mode = mode
-
-    def __len__(self):
-        if self.mode == 'train':
-            return self.num_iters
-        else:
-            return 1
-
-    def __getitem__(self, index):
-        return self.gt_image
-
-    @property
-    def size(self):
-        return self.gt_image.shape
-    
 
 def main():
     parser = ArgumentParser()
@@ -93,6 +69,7 @@ def main():
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=27)
 
     config['hw'] = train_dataset.size[:2]
+    config['value_range'] = train_dataset.range
     gs_system = GSSystem(hparams=config)
 
     trainer = Trainer(
@@ -117,7 +94,7 @@ def main():
         val_dataloaders=val_dataloader,
     )
 
-    trainer.predict(model=gs_system, dataloaders=val_dataloader)
+    # trainer.predict(model=gs_system, dataloaders=val_dataloader)
 
 
 if __name__ == "__main__":

@@ -62,7 +62,7 @@ class GSSystem(LightningModule):
         if self.hparams['loss']['w_mi'] > 0:
             pred_code = torch.sigmoid(self.gs_model.rgbs) * torch.sigmoid(self.gs_model.opacities)
             loss_mi = mi_loss(pred_code, self.codebook)
-            
+
             loss += self.hparams['loss']['w_mi'] * loss_mi
             self.log_step("train/loss_mi", loss_l1)
         
@@ -115,7 +115,10 @@ class GSSystem(LightningModule):
         self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
         # visualization
-        view = view_output(pred=output, gt=batch)
+        view = view_output(
+            pred=self._original(output), 
+            gt=self._original(batch),
+        )
         view = Image.fromarray(view)
         self.frames.append(view)
 
@@ -140,7 +143,11 @@ class GSSystem(LightningModule):
         print('mean_psnr', mean_psnr, 'mdp_psnr', mdp_psnr)
 
         # visualization
-        view = view_output(pred=output, gt=batch)
+        # view = view_output(pred=output, gt=batch)
+        view = view_output(
+            pred=self._original(output), 
+            gt=self._original(batch),
+        )
         view = Image.fromarray(view)
 
         view.save(os.path.join(self.save_folder, f"recon.png"))
@@ -187,3 +194,6 @@ class GSSystem(LightningModule):
 
     def on_load_checkpoint(self, checkpoint):
         self.gs_model = checkpoint['gs_model']
+
+    def _original(self, x):
+        return x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
