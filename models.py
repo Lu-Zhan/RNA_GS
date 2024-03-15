@@ -3,10 +3,9 @@ import torch
 
 
 class GaussModel(torch.nn.Module):
-    def __init__(self, num_points, hw, device):
+    def __init__(self, num_primarys, num_backups, hw, device):
         super(GaussModel, self).__init__()
-        self._init_gaussians(num_points, device)
-        self.zero_z = torch.zeros(num_points, 1, device=device)
+        self._init_gaussians(num_primarys, num_backups, device)
 
         fov_x = math.pi / 2.0
         self.H, self.W = hw[0], hw[1]
@@ -28,8 +27,37 @@ class GaussModel(torch.nn.Module):
 
     def load(self, path) -> None:
         pass
+    
+    def obtain_data(self):
+        return (
+            self.means_3d[self.persistent_mask],
+            self.scales[self.persistent_mask],
+            self.quats[self.persistent_mask],
+            self.rgbs[self.persistent_mask],
+            self.opacities[self.persistent_mask],
+        )
 
-    def _init_gaussians(self, num_points, device):
+    def maskout(self, indices):
+        self.means_3d.data[indices, :] = 0.
+        self.scales.data[indices, :] = 0.
+        self.quats.data[indices, :] = 0.
+        self.rgbs.data[indices, :] = 0.
+        self.opacities.data[indices, :] = 0.
+        self.persistent_mask[indices] = False
+    
+    @property
+    def colors(self):
+        rgbs = self.rgbs[self.persistent_mask]
+        opacities = self.opacities[self.persistent_mask]
+        return torch.sigmoid(rgbs) * torch.sigmoid(opacities)
+    
+    @property
+    def current_num_samples(self):
+        return float(self.persistent_mask.sum())
+
+    def _init_gaussians(self, num_primarys, num_backups, device):
+        num_points = num_primarys + num_backups
+
         self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # change to x y
         self.scales = torch.rand(num_points, 3, device=device) * 0.5
         self.rgbs = torch.rand(num_points, 15, device=device)
@@ -67,3 +95,10 @@ class GaussModel(torch.nn.Module):
         self.rgbs.requires_grad = True
         self.opacities.requires_grad = True
         self.viewmat.requires_grad = False
+
+        self.persistent_mask = torch.cat(
+            [torch.ones(num_primarys, dtype=bool), torch.zeros(num_backups, dtype=bool)], dim=0
+        )
+
+        self.current_marker = num_primarys
+

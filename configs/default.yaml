@@ -1,10 +1,14 @@
-exp_name: test_384_rad=1e-3_r-4
+exp_name: test_prune_th=5e-2_start=5k
 
 train:
   lr: 0.005
   iterations: 20000
-  num_samples: 8000
+  num_primarys: 8000
+  num_backups: 0
   tile_size: 16
+  densification_start: 1000
+  densification_interval: 200
+  densification_th: 0.05
 
 loss:
   w_l1: 0
@@ -14,7 +18,7 @@ loss:
   w_masked_l1: 1
   w_bg_l1: 1
   w_rho: 0
-  w_radius: 0.001
+  w_radius: 0
   w_mi: 0
 
 data:

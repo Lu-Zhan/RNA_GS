@@ -31,7 +31,8 @@ class GSSystem(LightningModule):
         self.frames = []
 
         self.gs_model = GaussModel(
-            num_points=self.hparams['train']['num_samples'], 
+            num_primarys=self.hparams['train']['num_primarys'],
+            num_backups=self.hparams['train']['num_backups'],
             hw=self.hparams['hw'],
             device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
         )
@@ -51,6 +52,13 @@ class GSSystem(LightningModule):
 
     def training_step(self, batch, batch_idx):
         batch = batch[0]
+
+        den_interval = self.hparams['train']['densification_interval']
+        den_start = self.hparams['train']['densification_start']
+
+        if den_interval > 0 and self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
+            self.prune_points()
+
         output, conics, radii, _ = self.forward()
 
         loss = 0.
@@ -96,14 +104,15 @@ class GSSystem(LightningModule):
             self.log_step("train/loss_radius", loss_radius)
         
         if self.hparams['loss']['w_mi'] > 0:
-            pred_code = self.pred_color
+            pred_code = self.gs_model.colors
             loss_mi = mi_loss(pred_code, self.codebook)
 
             loss += self.hparams['loss']['w_mi'] * loss_mi
             self.log_step("train/loss_mi", loss_mi)
 
         self.log_step("train/total_loss", loss, prog_bar=True)
-        self.log_step("train/", self.trainer.optimizers[0].param_groups[0]['lr'], prog_bar=True)
+        self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
+        self.log_step("params/num_samples", self.gs_model.current_num_samples, prog_bar=True)
 
         return loss
 
@@ -137,14 +146,14 @@ class GSSystem(LightningModule):
             position_on_dapi_image = view_positions(
                 points_xy=xys.detach().cpu().numpy(), 
                 bg_image=self.mdp_dapi_image.cpu().numpy(),
-                alpha=self.pred_color.cpu().numpy(),
+                alpha=self.gs_model.colors.cpu().numpy(),
             )
             position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
             position_on_mdp_image = view_positions(
                 points_xy=xys.detach().cpu().numpy(), 
                 bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-                alpha=self.pred_color.cpu().numpy(),
+                alpha=self.gs_model.colors.cpu().numpy(),
             )
             position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
 
@@ -183,14 +192,14 @@ class GSSystem(LightningModule):
         position_on_dapi_image = view_positions(
             points_xy=xys.detach().cpu().numpy(), 
             bg_image=self.mdp_dapi_image.cpu().numpy(),
-            alpha=self.pred_color.cpu().numpy(),
+            alpha=self.gs_model.colors.cpu().numpy(),
         )
         position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
         position_on_mdp_image = view_positions(
             points_xy=xys.detach().cpu().numpy(), 
             bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-            alpha=self.pred_color.cpu().numpy(),
+            alpha=self.gs_model.colors.cpu().numpy(),
         )
         position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
         
@@ -204,12 +213,23 @@ class GSSystem(LightningModule):
 
         return None
 
+    def prune_points(self):
+        # find indices to remove and update the persistent mask
+        rgbs = torch.sigmoid(self.gs_model.rgbs)
+        opacities = torch.sigmoid(self.gs_model.opacities)
+        colors = rgbs * opacities
+
+        indices_to_remove = (colors.max(dim=-1)[0] < self.hparams['train']['densification_th']).nonzero(as_tuple=True)[0]
+        self.gs_model.maskout(indices_to_remove)
+
     def forward(self):
+        means_3d, scales, quats, rgbs, opacities = self.gs_model.obtain_data()
+
         xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
-            self.gs_model.means_3d,
-            self.gs_model.scales,
+            means_3d,
+            scales,
             1,
-            self.gs_model.quats,
+            quats,
             self.gs_model.viewmat,
             self.gs_model.viewmat,
             self.gs_model.focal,
@@ -220,7 +240,6 @@ class GSSystem(LightningModule):
             self.gs_model.W,
             self.B_SIZE,
         )
-        # torch.cuda.synchronize()
        
         out_img = rasterize_gaussians(
             xys,
@@ -228,14 +247,13 @@ class GSSystem(LightningModule):
             radii,
             conics,
             num_tiles_hit,
-            torch.sigmoid(self.gs_model.rgbs),
-            torch.sigmoid(self.gs_model.opacities),
+            torch.sigmoid(rgbs),
+            torch.sigmoid(opacities),
             self.gs_model.H,
             self.gs_model.W,
             self.B_SIZE,
             self.gs_model.background,
         )
-        # torch.cuda.synchronize()
 
         return out_img, conics, radii, xys
 
@@ -249,7 +267,5 @@ class GSSystem(LightningModule):
 
     def _original(self, x):
         return x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
-    
-    @property
-    def pred_color(self):
-        return torch.sigmoid(self.gs_model.rgbs) * torch.sigmoid(self.gs_model.opacities)
+
+        
