@@ -110,13 +110,13 @@ class GSSystem(LightningModule):
             loss += self.hparams['loss']['w_radius'] * loss_radius
             self.log_step("train/loss_radius", loss_radius)
         
-        if self.hparams['loss']['w_mi'] > 0:
-            pred_code = self.gs_model.colors
-            loss_mi = mi_loss(pred_code, self.codebook)
+        pred_code = self.gs_model.colors
+        loss_mi = mi_loss(pred_code, self.codebook)
+        self.log_step("train/loss_mi", loss_mi)
 
+        if self.hparams['loss']['w_mi'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
             loss += self.hparams['loss']['w_mi'] * loss_mi
-            self.log_step("train/loss_mi", loss_mi)
-
+            
         # losses for map image
         if self.hparams['loss']['w_mdp_l2'] > 0:
             loss_mdp_l2 = mse_loss(mdp_output, self.mdp_image)

@@ -1,4 +1,4 @@
-exp_name: baseline_mdp_loss
+exp_name: baseline_mdp_loss_mi=1e-4
 
 train:
   lr: 0.005
@@ -10,6 +10,7 @@ train:
   densification_interval: -2
   densification_th: 0.005
   model: fix_gauss
+  codebook_start: 5000
 
 loss:
   w_l1: 0
@@ -20,7 +21,7 @@ loss:
   w_bg_l1: 1
   w_rho: 0
   w_radius: 0
-  w_mi: 0
+  w_mi: 0.0001
   w_mdp_l1: 0
   w_mdp_masked_l1: 1
   w_mdp_bg_l1: 1
