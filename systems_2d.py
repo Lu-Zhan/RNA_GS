@@ -15,7 +15,6 @@ from utils import calculate_mdp_psnr, read_codebook
 from models import model_zoo
 
 
-''' system '''
 class GSSystem(LightningModule):
     def __init__(self, hparams, **kwargs):  
         super().__init__()
@@ -109,13 +108,6 @@ class GSSystem(LightningModule):
             loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
             loss += self.hparams['loss']['w_radius'] * loss_radius
             self.log_step("train/loss_radius", loss_radius)
-        
-        pred_code = self.gs_model.colors
-        loss_mi = mi_loss(pred_code, self.codebook)
-        self.log_step("train/loss_mi", loss_mi)
-
-        if self.hparams['loss']['w_mi'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
-            loss += self.hparams['loss']['w_mi'] * loss_mi
             
         # losses for map image
         if self.hparams['loss']['w_mdp_l2'] > 0:
@@ -147,6 +139,19 @@ class GSSystem(LightningModule):
             loss_mdp_bg_l1 = bg_l1_loss(mdp_output, self.mdp_image)
             loss += self.hparams['loss']['w_mdp_bg_l1'] * loss_mdp_bg_l1
             self.log_step("train/loss_mdp_bg_l1", loss_mdp_bg_l1)
+        
+        pred_code = self.gs_model.colors
+        loss_mi = mi_loss(pred_code, self.codebook)
+        self.log_step("train/loss_mi", loss_mi)
+
+        loss_cos = cos_loss(pred_code, self.codebook)
+        self.log_step("train/loss_cos", loss_cos)
+
+        if self.hparams['loss']['w_mi'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
+            loss += self.hparams['loss']['w_mi'] * loss_mi
+
+        if self.hparams['loss']['w_cos'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
+            loss += self.hparams['loss']['w_cos'] * loss_cos
         
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])

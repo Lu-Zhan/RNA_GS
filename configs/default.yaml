@@ -1,4 +1,4 @@
-exp_name: baseline_mdp_loss_mi=1e-4
+exp_name: baseline_mdp_loss_cos=1e-3
 
 train:
   lr: 0.005
@@ -14,20 +14,22 @@ train:
 
 loss:
   w_l1: 0
+  w_masked_l1: 1
+  w_bg_l1: 1
   w_l2: 1
   w_masked_l2: 0
   w_bg_l2: 0
-  w_masked_l1: 1
-  w_bg_l1: 1
-  w_rho: 0
-  w_radius: 0
-  w_mi: 0.0001
   w_mdp_l1: 0
   w_mdp_masked_l1: 1
   w_mdp_bg_l1: 1
   w_mdp_l2: 1
   w_mdp_masked_l2: 0
   w_mdp_bg_l2: 0
+
+  w_rho: 0
+  w_radius: 0
+  w_mi: 0
+  w_cos: 0.001
 
 data:
   # data_path: ../data/IM41340_full/IM41340regi/2/0_4

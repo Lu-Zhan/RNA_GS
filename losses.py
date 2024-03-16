@@ -33,6 +33,21 @@ def mi_loss(pred_code, codebook, min_value=0):
     return loss.mean()
 
 
+def obtain_simi(pred_code, codebook):
+    simi = pred_code @ codebook.T  # (num_samples, 15) @ (15, 181) = (num_samples, 181)
+    simi = simi / (torch.norm(pred_code, dim=-1, keepdim=True) * torch.norm(codebook, dim=-1, keepdim=True).T + 1e-8)
+    max_simi = simi.max(dim=-1)[0]  # (num_samples, )
+    index = simi.max(dim=-1)[1]
+
+    return max_simi, index
+
+
+def cos_loss(pred_code, codebook):
+    max_simi = obtain_simi(pred_code, codebook)[0]
+    
+    return 1 - max_simi.mean()
+
+
 def masked_l1_loss(input, target):
     mask = target > 0
 
