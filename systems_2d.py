@@ -46,6 +46,8 @@ class GSSystem(LightningModule):
         except:
             print("dapi_images not available, read from checkpoint")
 
+        # self.automatic_optimization = False
+
     def configure_optimizers(self):
         optimizer = optim.Adam(self.gs_model.parameters, lr=self.hparams['train']['lr'])
         return optimizer
@@ -116,6 +118,13 @@ class GSSystem(LightningModule):
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
         self.log_step("params/num_samples", self.gs_model.current_num_samples, prog_bar=True)
+
+        # self.gs_model.maskout_grad()
+        # opt = self.optimizers()
+        # opt.zero_grad()
+
+        # self.manual_backward(loss)
+        # opt.step()
 
         return loss
 

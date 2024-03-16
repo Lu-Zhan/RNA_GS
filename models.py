@@ -45,6 +45,13 @@ class GaussModel(torch.nn.Module):
         self.opacities.data[indices, :] = 0.
         self.persistent_mask[indices] = False
     
+    def maskout_grad(self):
+        self.means_3d.grad[~self.persistent_mask, :] = 0.
+        self.scales.grad[~self.persistent_mask, :] = 0.
+        self.quats.grad[~self.persistent_mask, :] = 0.
+        self.rgbs.grad[~self.persistent_mask, :] = 0.
+        self.opacities.grad[~self.persistent_mask, :] = 0.
+    
     @property
     def colors(self):
         rgbs = self.rgbs[self.persistent_mask]
