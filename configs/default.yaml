@@ -1,4 +1,4 @@
-exp_name: test_prune_th=5e-2_start=5k
+exp_name: bascline_l1l2
 
 train:
   lr: 0.005
@@ -7,17 +7,17 @@ train:
   num_backups: 0
   tile_size: 16
   densification_start: 1000
-  densification_interval: 200
+  densification_interval: -2
   densification_th: 0.05
 
 loss:
-  w_l1: 0
+  w_l1: 1
   w_l2: 1
-  w_masked_l2: 0
-  w_bg_l2: 0
+  w_masked_l2: 1
+  w_bg_l2: 1
   w_masked_l1: 1
   w_bg_l1: 1
-  w_rho: 0
+  w_rho: 0.001
   w_radius: 0
   w_mi: 0
 

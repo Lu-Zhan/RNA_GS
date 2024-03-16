@@ -211,7 +211,7 @@ class GSSystem(LightningModule):
         except:
             print("wandb not available")
 
-        return None
+        return 1
 
     def prune_points(self):
         # find indices to remove and update the persistent mask
@@ -240,9 +240,9 @@ class GSSystem(LightningModule):
             self.gs_model.W,
             self.B_SIZE,
         )
-       
+
         out_img = rasterize_gaussians(
-            xys,
+            xys, 
             depths,
             radii,
             conics,
