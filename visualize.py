@@ -23,9 +23,9 @@ def view_positions(points_xy, bg_image, alpha=1):
     plt.title(f"Points: {len(points_xy)}")
 
     plt.tight_layout()
-    plt.subplots_adjust(
-        left=0.05, bottom=0.05, right=0.95, top=0.95, wspace=0.05, hspace=0.15
-    )
+    # plt.subplots_adjust(
+    #     left=0.05, bottom=0.05, right=0.95, top=0.95, wspace=0.05, hspace=0.15
+    # )
     fig.canvas.draw()
 
     # Now we can save it to a numpy array.

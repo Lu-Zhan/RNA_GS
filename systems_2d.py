@@ -154,7 +154,7 @@ class GSSystem(LightningModule):
             position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
             position_on_mdp_image = view_positions(
-                points_xy=xys.detach().cpu().numpy(), 
+                points_xy=xys.detach().cpu().numpy(),
                 bg_image=batch.max(dim=-1)[0].cpu().numpy(),
                 alpha=self.gs_model.colors.cpu().numpy(),
             )
