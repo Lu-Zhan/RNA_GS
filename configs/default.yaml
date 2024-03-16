@@ -1,14 +1,15 @@
-exp_name: region_0
+exp_name: baseline_mdp_loss
 
 train:
   lr: 0.005
   iterations: 20000
-  num_primarys: 70000
+  num_primarys: 8000
   num_backups: 0
   tile_size: 16
   densification_start: 1000
-  densification_interval: 200
+  densification_interval: -2
   densification_th: 0.005
+  model: fix_gauss
 
 loss:
   w_l1: 0
@@ -19,11 +20,17 @@ loss:
   w_bg_l1: 1
   w_rho: 0
   w_radius: 0
-  w_mi: 0.0001
+  w_mi: 0
+  w_mdp_l1: 0
+  w_mdp_masked_l1: 1
+  w_mdp_bg_l1: 1
+  w_mdp_l2: 1
+  w_mdp_masked_l2: 0
+  w_mdp_bg_l2: 0
 
 data:
-  data_path: ../data/IM41340_full/IM41340regi/2/0_4
-  # data_path: ../data/IM41340_tiled/1_36
+  # data_path: ../data/IM41340_full/IM41340regi/2/0_4
+  data_path: ../data/IM41340_tiled/1_36
   codebook_path: ../data/codebook.xlsx
 
 model:

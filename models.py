@@ -1,11 +1,12 @@
 import math
 import torch
 
-
 class GaussModel(torch.nn.Module):
     def __init__(self, num_primarys, num_backups, hw, device):
         super(GaussModel, self).__init__()
         self._init_gaussians(num_primarys, num_backups, device)
+
+        self._init_mask(num_primarys, num_backups)
 
         fov_x = math.pi / 2.0
         self.H, self.W = hw[0], hw[1]
@@ -103,9 +104,36 @@ class GaussModel(torch.nn.Module):
         self.opacities.requires_grad = True
         self.viewmat.requires_grad = False
 
+    def _init_mask(self, num_primarys, num_backups):
         self.persistent_mask = torch.cat(
             [torch.ones(num_primarys, dtype=bool), torch.zeros(num_backups, dtype=bool)], dim=0
         )
 
         self.current_marker = num_primarys
 
+
+class FixGaussModel(GaussModel):
+    def obtain_data(self):
+        return (
+            self.means_3d,
+            self.scales,
+            self.quats,
+            self.rgbs,
+            self.opacities,
+        )
+
+    @property
+    def colors(self):
+        rgbs = self.rgbs
+        opacities = self.opacities
+        return torch.sigmoid(rgbs) * torch.sigmoid(opacities)
+
+    @property
+    def current_num_samples(self):
+        return self.rgbs.shape[0]
+
+
+model_zoo = {
+    "gauss": GaussModel,
+    "fix_gauss": FixGaussModel,
+}

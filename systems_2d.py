@@ -12,14 +12,13 @@ from gsplat.rasterize import rasterize_gaussians
 from losses import *
 from visualize import view_recon, view_positions
 from utils import calculate_mdp_psnr, read_codebook
-from models import GaussModel
+from models import model_zoo
 
 
 ''' system '''
 class GSSystem(LightningModule):
     def __init__(self, hparams, **kwargs):  
         super().__init__()
-
         self.save_hyperparameters(hparams)
         self.B_SIZE = hparams['train']['tile_size']
 
@@ -29,8 +28,9 @@ class GSSystem(LightningModule):
         os.makedirs(os.path.join(self.save_folder, "epoch"), exist_ok=True)
 
         self.frames = []
+        self.mdp_image = None
 
-        self.gs_model = GaussModel(
+        self.gs_model = model_zoo[hparams['train']['model']](
             num_primarys=self.hparams['train']['num_primarys'],
             num_backups=self.hparams['train']['num_backups'],
             hw=self.hparams['hw'],
@@ -55,13 +55,18 @@ class GSSystem(LightningModule):
     def training_step(self, batch, batch_idx):
         batch = batch[0]
 
+        if self.mdp_image is None:
+            self.mdp_image = batch.max(dim=-1)[0]
+
         den_interval = self.hparams['train']['densification_interval']
         den_start = self.hparams['train']['densification_start']
 
-        if den_interval > 0 and self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
-            self.prune_points()
+        if den_interval > 0 and self.hparams['train']['model'] == 'guass':
+            if self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
+                self.prune_points()
 
         output, conics, radii, _ = self.forward()
+        mdp_output = output.max(dim=-1)[0]
 
         loss = 0.
 
@@ -94,14 +99,11 @@ class GSSystem(LightningModule):
             loss_bg_l1 = bg_l1_loss(output, batch)
             loss += self.hparams['loss']['w_bg_l1'] * loss_bg_l1
             self.log_step("train/loss_bg_l1", loss_bg_l1)
-        
-        loss_rho = rho_loss(conics)
-        self.log_step("train/loss_rho", loss_rho)
 
         if self.hparams['loss']['w_rho'] > 0:
-            # loss_rho = rho_loss(conics)
+            loss_rho = rho_loss(conics)
             loss += self.hparams['loss']['w_rho'] * loss_rho
-            # self.log_step("train/loss_rho", loss_rho)
+            self.log_step("train/loss_rho", loss_rho)
         
         if self.hparams['loss']['w_radius'] > 0:
             loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
@@ -115,6 +117,37 @@ class GSSystem(LightningModule):
             loss += self.hparams['loss']['w_mi'] * loss_mi
             self.log_step("train/loss_mi", loss_mi)
 
+        # losses for map image
+        if self.hparams['loss']['w_mdp_l2'] > 0:
+            loss_mdp_l2 = mse_loss(mdp_output, self.mdp_image)
+            loss += self.hparams['loss']['w_mdp_l2'] * loss_mdp_l2
+            self.log_step("train/loss_mdp_l2", loss_mdp_l2)
+        
+        if self.hparams['loss']['w_mdp_masked_l2'] > 0:
+            loss_mdp_masked_l2 = masked_mse_loss(mdp_output, self.mdp_image)
+            loss += self.hparams['loss']['w_mdp_masked_l2'] * loss_mdp_masked_l2
+            self.log_step("train/loss_mdp_masked_l2", loss_mdp_masked_l2)
+        
+        if self.hparams['loss']['w_mdp_bg_l2'] > 0:
+            loss_mdp_bg_l2 = bg_mse_loss(mdp_output, self.mdp_image)
+            loss += self.hparams['loss']['w_mdp_bg_l2'] * loss_mdp_bg_l2
+            self.log_step("train/loss_mdp_bg_l2", loss_mdp_bg_l2)
+        
+        if self.hparams['loss']['w_mdp_l1'] > 0:
+            loss_mdp_l1 = l1_loss(mdp_output, self.mdp_image)
+            loss += self.hparams['loss']['w_mdp_l1'] * loss_mdp_l1
+            self.log_step("train/loss_mdp_l1", loss_mdp_l1)
+
+        if self.hparams['loss']['w_mdp_masked_l1'] > 0:
+            loss_mdp_masked_l1 = masked_l1_loss(mdp_output, self.mdp_image)
+            loss += self.hparams['loss']['w_mdp_masked_l1'] * loss_mdp_masked_l1
+            self.log_step("train/loss_mdp_masked_l1", loss_mdp_masked_l1)
+        
+        if self.hparams['loss']['w_mdp_bg_l1'] > 0:
+            loss_mdp_bg_l1 = bg_l1_loss(mdp_output, self.mdp_image)
+            loss += self.hparams['loss']['w_mdp_bg_l1'] * loss_mdp_bg_l1
+            self.log_step("train/loss_mdp_bg_l1", loss_mdp_bg_l1)
+        
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
         self.log_step("params/num_samples", self.gs_model.current_num_samples, prog_bar=True)
