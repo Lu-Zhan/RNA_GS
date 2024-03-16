@@ -93,10 +93,13 @@ class GSSystem(LightningModule):
             loss += self.hparams['loss']['w_bg_l1'] * loss_bg_l1
             self.log_step("train/loss_bg_l1", loss_bg_l1)
         
+        loss_rho = rho_loss(conics)
+        self.log_step("train/loss_rho", loss_rho)
+
         if self.hparams['loss']['w_rho'] > 0:
-            loss_rho = rho_loss(conics)
+            # loss_rho = rho_loss(conics)
             loss += self.hparams['loss']['w_rho'] * loss_rho
-            self.log_step("train/loss_rho", loss_rho)
+            # self.log_step("train/loss_rho", loss_rho)
         
         if self.hparams['loss']['w_radius'] > 0:
             loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
