@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from torch.nn.functional import grid_sample
 
 class RNADataset(Dataset):
-    def __init__(self, hparams, mode='train', rescale=True):  
+    def __init__(self, hparams, mode='train'):  
         path = Path(hparams['data']['data_path'])
 
         try:
@@ -22,9 +22,13 @@ class RNADataset(Dataset):
 
         self.gt_images = self.gt_images ** 0.5
 
+        self.color_bias = hparams['train']['color_bias']
+
+        self.gt_images = self.gt_images * (1 - self.color_bias * 2) + self.color_bias
+
         self.num_iters = hparams['train']['iterations']
         self.mode = mode
-
+        
     def __len__(self):
         if self.mode == 'train':
             return self.num_iters

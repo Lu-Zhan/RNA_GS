@@ -31,13 +31,13 @@ class GaussModel(torch.nn.Module):
     def load(self, path) -> None:
         pass
     
-    def obtain_data(self, sacle=1.0):
+    def obtain_data(self):
         return (
             self.means_3d[self.persistent_mask],
             self.scales[self.persistent_mask],
             self.quats[self.persistent_mask],
-            torch.clamp(torch.sigmoid(self.rgbs[self.persistent_mask]) * sacle + 0.5 * (1 - sacle), 0, 1),
-            torch.clamp(torch.sigmoid(self.opacities[self.persistent_mask]) * sacle + 0.5 * (1 - sacle), 0, 1),
+            torch.sigmoid(self.rgbs[self.persistent_mask]),
+            torch.sigmoid(self.opacities[self.persistent_mask]),
         )
 
     def maskout(self, indices):
@@ -55,12 +55,13 @@ class GaussModel(torch.nn.Module):
         self.rgbs.grad[~self.persistent_mask, :] = 0.
         self.opacities.grad[~self.persistent_mask, :] = 0.
     
-    def colors(self, scale=1.0):
+    @property
+    def colors(self):
         rgbs = self.rgbs[self.persistent_mask]
         opacities = self.opacities[self.persistent_mask]
 
-        clamped_rgbs = torch.clamp(torch.sigmoid(rgbs) * scale + 0.5 * (1 - scale), 0, 1)
-        clamped_opacities = torch.clamp(torch.sigmoid(opacities) * scale + 0.5 * (1 - scale), 0, 1)
+        clamped_rgbs = torch.sigmoid(rgbs)
+        clamped_opacities = torch.sigmoid(opacities)
 
         return clamped_rgbs * clamped_opacities
 
@@ -130,18 +131,19 @@ class GaussModel(torch.nn.Module):
 
 
 class FixGaussModel(GaussModel):
-    def obtain_data(self, scale=1.0):
+    def obtain_data(self):
         return (
             self.means_3d,
             self.scales,
             self.quats,
-            torch.clamp(torch.sigmoid(self.rgbs) * scale + 0.5 * (1 - scale), 0, 1),
-            torch.clamp(torch.sigmoid(self.opacities) * scale + 0.5 * (1 - scale), 0, 1),
+            torch.sigmoid(self.rgbs),
+            torch.sigmoid(self.opacities),
         )
 
-    def colors(self, scale=1.0):
-        clamped_rgbs = torch.clamp(torch.sigmoid(self.rgbs) * scale + 0.5 * (1 - scale), 0, 1)
-        clamped_opacities = torch.clamp(torch.sigmoid(self.opacities) * scale + 0.5 * (1 - scale), 0, 1)
+    @property
+    def colors(self):
+        clamped_rgbs = torch.sigmoid(self.rgbs)
+        clamped_opacities = torch.sigmoid(self.opacities)
 
         return clamped_rgbs * clamped_opacities
 

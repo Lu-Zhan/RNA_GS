@@ -1,4 +1,4 @@
-exp_name: baseline_low_color_s=1.1
+exp_name: baseline_low_color_bias=0.01
 
 train:
   lr: 0.005
@@ -12,7 +12,7 @@ train:
   model: fix_gauss
   codebook_start: 5000
   init_rgb: 0
-  color_scale: 1.1
+  color_bias: 0.01
 
 loss:
   w_l1: 0

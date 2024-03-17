@@ -147,7 +147,7 @@ class GSSystem(LightningModule):
             loss += self.hparams['loss']['w_mdp_bg_l1'] * loss_mdp_bg_l1
             self.log_step("train/loss_mdp_bg_l1", loss_mdp_bg_l1)
         
-        pred_code = self.gs_model.colors(scale=self.hparams['train']['color_scale'])
+        pred_code = self.gs_model.colors
         loss_mi = mi_loss(pred_code, self.codebook)
         self.log_step("train/loss_mi", loss_mi)
 
@@ -173,6 +173,9 @@ class GSSystem(LightningModule):
         batch = batch[0]
         output, _, _, xys = self.forward()
 
+        output = self._original(output)
+        batch = self._original(batch)
+
         # metric
         mean_mse = torch.mean((output - batch) ** 2).cpu()
         mean_psnr = float(10 * torch.log10(1 / mean_mse))
@@ -181,10 +184,7 @@ class GSSystem(LightningModule):
         self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
         # visualization
-        recon_image = view_recon(
-            pred=self._original(output), 
-            gt=self._original(batch),
-        )
+        recon_image = view_recon(pred=output, gt=batch)
         recon_image = Image.fromarray(recon_image)
         self.frames.append(recon_image)
         recon_image.save(os.path.join(self.save_folder, "epoch", f"epoch_{self.global_step:05d}.png"))
@@ -196,14 +196,14 @@ class GSSystem(LightningModule):
             position_on_dapi_image = view_positions(
                 points_xy=xys.detach().cpu().numpy(), 
                 bg_image=self.mdp_dapi_image.cpu().numpy(),
-                alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
+                alpha=self.gs_model.colors.cpu().numpy(),
             )
             position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
             position_on_mdp_image = view_positions(
                 points_xy=xys.detach().cpu().numpy(),
                 bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-                alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
+                alpha=self.gs_model.colors.cpu().numpy(),
             )
             position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
 
@@ -223,6 +223,9 @@ class GSSystem(LightningModule):
         batch = batch[0]
         output, _, _, xys = self.forward()
 
+        output = self._original(output)
+        batch = self._original(batch)
+
         # metric
         mean_mse = torch.mean((output - batch) ** 2).cpu()
         mean_psnr = float(10 * torch.log10(1 / mean_mse))
@@ -230,11 +233,7 @@ class GSSystem(LightningModule):
         print(f'mean_psnr: {mean_psnr:.4f}, mdp_psnr: {mdp_psnr:.4f}')
 
         # visualization
-        recon_image = view_recon(
-            pred=self._original(output), 
-            gt=self._original(batch),
-            resize=(384, 384),
-        )
+        recon_image = view_recon(pred=output, gt=batch, resize=(576, 576))
         recon_image = Image.fromarray(recon_image)
 
         recon_image.save(os.path.join(self.save_folder, f"recon.png"))
@@ -242,14 +241,14 @@ class GSSystem(LightningModule):
         position_on_dapi_image = view_positions(
             points_xy=xys.detach().cpu().numpy(), 
             bg_image=self.mdp_dapi_image.cpu().numpy(),
-            alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
+            alpha=self.gs_model.colors.cpu().numpy(),
         )
         position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
         position_on_mdp_image = view_positions(
             points_xy=xys.detach().cpu().numpy(), 
             bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-            alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
+            alpha=self.gs_model.colors.cpu().numpy(),
         )
         position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
         
@@ -273,9 +272,7 @@ class GSSystem(LightningModule):
         self.gs_model.maskout(indices_to_remove)
 
     def forward(self):
-        means_3d, scales, quats, rgbs, opacities = self.gs_model.obtain_data(
-            scale=self.hparams['train']['color_scale']
-        )
+        means_3d, scales, quats, rgbs, opacities = self.gs_model.obtain_data()
 
         xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
             means_3d,
@@ -318,6 +315,9 @@ class GSSystem(LightningModule):
         self.mdp_dapi_image = checkpoint['mdp_dapi_image']
 
     def _original(self, x):
-        return x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
+        x = x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
+        x = (x - self.hparams['train']['color_bias']) / (1 - self.hparams['train']['color_bias'] * 2)
+
+        return x
     
         
