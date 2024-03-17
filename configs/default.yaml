@@ -1,4 +1,4 @@
-exp_name: baseline_low_color_bias=0.01
+exp_name: baseline_low_color_bias=0.01_init_rgb=1_fix0
 
 train:
   lr: 0.005
@@ -11,7 +11,7 @@ train:
   densification_th: 0.005
   model: fix_gauss
   codebook_start: 5000
-  init_rgb: 0
+  init_rgb: 1
   color_bias: 0.01
 
 loss:

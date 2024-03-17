@@ -120,14 +120,15 @@ class GaussModel(torch.nn.Module):
         self.current_marker = num_primarys
     
     def init_rgbs(self, xys, gt_images):
+        # color range (color_bias, 1 - color_bias)
         color = obtain_init_color(
             input_xys=xys,
             hw=[self.H, self.W],
             image=gt_images,
         )
 
-        # y = 1.1 / (1 + exp(-x)), exp(-x) = 1.1 / y - 1, x = - log(1.1 / y - 1)
-        self.rgbs.data = - torch.log(1 / color - 1)
+        # y = 1 / (1 + exp(-x)), exp(-x) = 1 / y - 1, x = - log(1 / y - 1)
+        self.rgbs.data = - torch.log(1 / (color * (1 - 2e-8) + 1e-8) - 1)
 
 
 class FixGaussModel(GaussModel):

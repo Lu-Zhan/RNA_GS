@@ -315,8 +315,8 @@ class GSSystem(LightningModule):
         self.mdp_dapi_image = checkpoint['mdp_dapi_image']
 
     def _original(self, x):
-        x = x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
         x = (x - self.hparams['train']['color_bias']) / (1 - self.hparams['train']['color_bias'] * 2)
+        x = x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
 
         return x
     
