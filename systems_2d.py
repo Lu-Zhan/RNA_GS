@@ -28,6 +28,7 @@ class GSSystem(LightningModule):
 
         self.frames = []
         self.mdp_image = None
+        self.is_init_rgb = False
 
         self.gs_model = model_zoo[hparams['train']['model']](
             num_primarys=self.hparams['train']['num_primarys'],
@@ -53,6 +54,12 @@ class GSSystem(LightningModule):
 
     def training_step(self, batch, batch_idx):
         batch = batch[0]
+
+        if self.is_init_rgb is False and self.hparams['train']['init_rgb']:
+            with torch.no_grad():
+                _, _, _, xys = self.forward()
+                self.gs_model.init_rgbs(xys=xys, gt_images=batch)
+            self.is_init_rgb = True
 
         if self.mdp_image is None:
             self.mdp_image = batch.max(dim=-1)[0]
@@ -140,7 +147,7 @@ class GSSystem(LightningModule):
             loss += self.hparams['loss']['w_mdp_bg_l1'] * loss_mdp_bg_l1
             self.log_step("train/loss_mdp_bg_l1", loss_mdp_bg_l1)
         
-        pred_code = self.gs_model.colors
+        pred_code = self.gs_model.colors(scale=self.hparams['train']['color_scale'])
         loss_mi = mi_loss(pred_code, self.codebook)
         self.log_step("train/loss_mi", loss_mi)
 
@@ -156,13 +163,6 @@ class GSSystem(LightningModule):
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
         self.log_step("params/num_samples", self.gs_model.current_num_samples, prog_bar=True)
-
-        # self.gs_model.maskout_grad()
-        # opt = self.optimizers()
-        # opt.zero_grad()
-
-        # self.manual_backward(loss)
-        # opt.step()
 
         return loss
 
@@ -196,14 +196,14 @@ class GSSystem(LightningModule):
             position_on_dapi_image = view_positions(
                 points_xy=xys.detach().cpu().numpy(), 
                 bg_image=self.mdp_dapi_image.cpu().numpy(),
-                alpha=self.gs_model.colors.cpu().numpy(),
+                alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
             )
             position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
             position_on_mdp_image = view_positions(
                 points_xy=xys.detach().cpu().numpy(),
                 bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-                alpha=self.gs_model.colors.cpu().numpy(),
+                alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
             )
             position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
 
@@ -242,14 +242,14 @@ class GSSystem(LightningModule):
         position_on_dapi_image = view_positions(
             points_xy=xys.detach().cpu().numpy(), 
             bg_image=self.mdp_dapi_image.cpu().numpy(),
-            alpha=self.gs_model.colors.cpu().numpy(),
+            alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
         )
         position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
         position_on_mdp_image = view_positions(
             points_xy=xys.detach().cpu().numpy(), 
             bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-            alpha=self.gs_model.colors.cpu().numpy(),
+            alpha=self.gs_model.colors(scale=self.hparams['train']['color_scale']).cpu().numpy(),
         )
         position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
         
@@ -273,7 +273,9 @@ class GSSystem(LightningModule):
         self.gs_model.maskout(indices_to_remove)
 
     def forward(self):
-        means_3d, scales, quats, rgbs, opacities = self.gs_model.obtain_data()
+        means_3d, scales, quats, rgbs, opacities = self.gs_model.obtain_data(
+            scale=self.hparams['train']['color_scale']
+        )
 
         xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
             means_3d,
@@ -297,8 +299,8 @@ class GSSystem(LightningModule):
             radii,
             conics,
             num_tiles_hit,
-            torch.sigmoid(rgbs),
-            torch.sigmoid(opacities),
+            rgbs,
+            opacities,
             self.gs_model.H,
             self.gs_model.W,
             self.B_SIZE,
@@ -317,5 +319,5 @@ class GSSystem(LightningModule):
 
     def _original(self, x):
         return x * (self.hparams['value_range'][1] - self.hparams['value_range'][0]) + self.hparams['value_range'][0]
-
+    
         

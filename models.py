@@ -1,6 +1,8 @@
 import math
 import torch
 
+from datasets import obtain_init_color
+
 class GaussModel(torch.nn.Module):
     def __init__(self, num_primarys, num_backups, hw, device):
         super(GaussModel, self).__init__()
@@ -29,13 +31,13 @@ class GaussModel(torch.nn.Module):
     def load(self, path) -> None:
         pass
     
-    def obtain_data(self):
+    def obtain_data(self, sacle=1.0):
         return (
             self.means_3d[self.persistent_mask],
             self.scales[self.persistent_mask],
             self.quats[self.persistent_mask],
-            self.rgbs[self.persistent_mask],
-            self.opacities[self.persistent_mask],
+            torch.clamp(torch.sigmoid(self.rgbs[self.persistent_mask]) * sacle + 0.5 * (1 - sacle), 0, 1),
+            torch.clamp(torch.sigmoid(self.opacities[self.persistent_mask]) * sacle + 0.5 * (1 - sacle), 0, 1),
         )
 
     def maskout(self, indices):
@@ -53,12 +55,15 @@ class GaussModel(torch.nn.Module):
         self.rgbs.grad[~self.persistent_mask, :] = 0.
         self.opacities.grad[~self.persistent_mask, :] = 0.
     
-    @property
-    def colors(self):
+    def colors(self, scale=1.0):
         rgbs = self.rgbs[self.persistent_mask]
         opacities = self.opacities[self.persistent_mask]
-        return torch.sigmoid(rgbs) * torch.sigmoid(opacities)
-    
+
+        clamped_rgbs = torch.clamp(torch.sigmoid(rgbs) * scale + 0.5 * (1 - scale), 0, 1)
+        clamped_opacities = torch.clamp(torch.sigmoid(opacities) * scale + 0.5 * (1 - scale), 0, 1)
+
+        return clamped_rgbs * clamped_opacities
+
     @property
     def current_num_samples(self):
         return float(self.persistent_mask.sum())
@@ -68,7 +73,6 @@ class GaussModel(torch.nn.Module):
 
         self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # change to x y
         self.scales = torch.rand(num_points, 3, device=device) * 0.5
-        self.rgbs = torch.rand(num_points, 15, device=device)
 
         u = torch.rand(num_points, 1, device=device)
         v = torch.rand(num_points, 1, device=device)
@@ -100,9 +104,12 @@ class GaussModel(torch.nn.Module):
         self.means_3d.requires_grad = True
         self.scales.requires_grad = True
         self.quats.requires_grad = True
-        self.rgbs.requires_grad = True
         self.opacities.requires_grad = True
         self.viewmat.requires_grad = False
+
+        # self.rgbs = torch.rand(num_points, 15, device=device)
+        self.rgbs = torch.randn(num_points, 15, device=device) / 0.4
+        self.rgbs.requires_grad = True
 
     def _init_mask(self, num_primarys, num_backups):
         self.persistent_mask = torch.cat(
@@ -110,23 +117,33 @@ class GaussModel(torch.nn.Module):
         )
 
         self.current_marker = num_primarys
+    
+    def init_rgbs(self, xys, gt_images):
+        color = obtain_init_color(
+            input_xys=xys,
+            hw=[self.H, self.W],
+            image=gt_images,
+        )
+
+        # y = 1.1 / (1 + exp(-x)), exp(-x) = 1.1 / y - 1, x = - log(1.1 / y - 1)
+        self.rgbs.data = - torch.log(1 / color - 1)
 
 
 class FixGaussModel(GaussModel):
-    def obtain_data(self):
+    def obtain_data(self, scale=1.0):
         return (
             self.means_3d,
             self.scales,
             self.quats,
-            self.rgbs,
-            self.opacities,
+            torch.clamp(torch.sigmoid(self.rgbs) * scale + 0.5 * (1 - scale), 0, 1),
+            torch.clamp(torch.sigmoid(self.opacities) * scale + 0.5 * (1 - scale), 0, 1),
         )
 
-    @property
-    def colors(self):
-        rgbs = self.rgbs
-        opacities = self.opacities
-        return torch.sigmoid(rgbs) * torch.sigmoid(opacities)
+    def colors(self, scale=1.0):
+        clamped_rgbs = torch.clamp(torch.sigmoid(self.rgbs) * scale + 0.5 * (1 - scale), 0, 1)
+        clamped_opacities = torch.clamp(torch.sigmoid(self.opacities) * scale + 0.5 * (1 - scale), 0, 1)
+
+        return clamped_rgbs * clamped_opacities
 
     @property
     def current_num_samples(self):
