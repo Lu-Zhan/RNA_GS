@@ -196,23 +196,25 @@ class GSSystem(LightningModule):
             self.logger.experiment.log({"val_image": [wandb.Image(recon_image, caption="val_image")]}, step=self.global_step)
         
         if self.global_step % 10000 == 0:
-            view_on_dapi, view_on_dapi_post, view_on_image, view_on_image_post = self.gs_model.visualize_points(
+            view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref = self.gs_model.visualize_points(
                 xys=xys, 
                 batch=batch,
                 mdp_dapi_image=self.mdp_dapi_image,
                 post_th=self.hparams['process']['bg_filter_th'],
+                rna_class=self.rna_class, 
+                rna_name=self.rna_name,
             )
 
-            view_on_dapi.save(os.path.join(self.save_folder, f"positions_dapi.png"))
-            view_on_dapi_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
             view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
             view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
+            view_on_image_cos.save(os.path.join(self.save_folder, f"positions_mdp_cos.png"))
+            view_on_image_ref.save(os.path.join(self.save_folder, f"positions_mdp_ref.png"))
 
             self.logger.experiment.log({"positions": [
-                wandb.Image(view_on_dapi, caption="dapi"),
                 wandb.Image(view_on_image, caption="mdp"),
-                wandb.Image(view_on_dapi_post, caption="dapi_post"),
                 wandb.Image(view_on_image_post, caption="mdp_post"),
+                wandb.Image(view_on_image_cos, caption="mdp_cos"),
+                wandb.Image(view_on_image_ref, caption="mdp_ref"),
             ]})
 
             if self.global_step > 0:
@@ -251,25 +253,27 @@ class GSSystem(LightningModule):
         recon_image.save(os.path.join(self.save_folder, f"recon.png"))
         
         # visualize points
-        view_on_dapi, view_on_dapi_post, view_on_image, view_on_image_post = self.gs_model.visualize_points(
+        view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref = self.gs_model.visualize_points(
             xys=xys, 
             batch=batch,
             mdp_dapi_image=self.mdp_dapi_image,
             post_th=self.hparams['process']['bg_filter_th'],
+            rna_class=self.rna_class, 
+            rna_name=self.rna_name,
         )
 
-        view_on_dapi.save(os.path.join(self.save_folder, f"positions_dapi.png"))
-        view_on_dapi_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
         view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
         view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
+        view_on_image_cos.save(os.path.join(self.save_folder, f"positions_mdp_cos.png"))
+        view_on_image_ref.save(os.path.join(self.save_folder, f"positions_mdp_ref.png"))
         
         try:
             self.logger.experiment.log({
                 "positions": [
-                    wandb.Image(view_on_dapi, caption="dapi"),
                     wandb.Image(view_on_image, caption="mdp"),
-                    wandb.Image(view_on_dapi_post, caption="dapi_post"),
                     wandb.Image(view_on_image_post, caption="mdp_post"),
+                    wandb.Image(view_on_image_cos, caption="mdp_cos"),
+                    wandb.Image(view_on_image_ref, caption="mdp_ref"),
                 ],
                 "recon": wandb.Image(recon_image, caption="recon"),
             })

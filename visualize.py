@@ -13,14 +13,14 @@ def view_positions(points_xy, bg_image, alpha=1):
     points_xy = points_xy[mask]
 
     alpha = alpha[mask]
-    alpha = np.max(alpha, axis=-1)
-    alpha = alpha / (alpha.max() + 1e-8)
+    # alpha = np.max(alpha, axis=-1)
+    # alpha = alpha / (alpha.max() + 1e-8)
 
     fig, ax = plt.subplots()
     ax.imshow(bg_image, cmap="gray")
     ax.scatter(points_xy[:, 0], points_xy[:, 1], c="r", s=1, alpha=alpha)
     ax.axis("off")
-    plt.title(f"Points: {len(points_xy)}")
+    plt.title(f"Points: {len(points_xy)}, top0.9: {len(alpha[alpha > 0.8])}, top0.7: {len(alpha[alpha > 0.5])}, top0.5: {len(alpha[alpha > 0.2])}")
 
     plt.tight_layout()
     # plt.subplots_adjust(
