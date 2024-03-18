@@ -220,9 +220,11 @@ class GSSystem(LightningModule):
             if self.global_step > 0:
                 self.gs_model.save_to_csv(
                     xys=xys,
+                    batch=batch,
                     rna_class=self.rna_class, 
                     rna_name=self.rna_name,
                     hw=self.hparams['hw'],
+                    post_th=self.hparams['process']['bg_filter_th'],
                     path=os.path.join(self.save_folder, "results.csv"),
                 )
 
@@ -283,9 +285,11 @@ class GSSystem(LightningModule):
         # save to csv
         self.gs_model.save_to_csv(
             xys=xys,
+            batch=batch,
             rna_class=self.rna_class, 
             rna_name=self.rna_name,
             hw=self.hparams['hw'],
+            post_th=self.hparams['process']['bg_filter_th'],
             path=os.path.join(self.save_folder, "results.csv"),
         )
 

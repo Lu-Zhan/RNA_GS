@@ -148,20 +148,24 @@ class GaussModel(torch.nn.Module):
         cos_score, pred_rna_index = obtain_simi(pred_code=self.colors, codebook=rna_class)
         pred_rna_name = rna_name[pred_rna_index.cpu().numpy()]
 
-        max_color = self.colors.max(dim=-1)[0]
-        max_color = max_color / (max_color.max() + 1e-8)
-        
-        ref_score = cos_score * max_color
-
-        return cos_score, ref_score, pred_rna_index, pred_rna_name, max_color
+        return cos_score, pred_rna_index, pred_rna_name
 
     @torch.no_grad()
-    def save_to_csv(self, xys, rna_class, rna_name, hw, path):
-        cos_score, ref_score, pred_rna_index, pred_rna_name, max_color = self.obtain_calibration(rna_class, rna_name)
+    def save_to_csv(self, xys, batch, rna_class, rna_name, hw, post_th, path):
+        max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+
+        cos_score, pred_rna_index, pred_rna_name = self.obtain_calibration(
+            rna_class, 
+            rna_name,
+        )
+
+        ref_score = cos_score * max_color_post
 
         write_to_csv(
             xys=xys,
-            scores=torch.stack([ref_score, cos_score, max_color], dim=-1),
+            scores=torch.stack([ref_score, cos_score, max_color_post], dim=-1),
             hw=hw,
             rna_index=pred_rna_index,
             rna_name=pred_rna_name,
@@ -171,13 +175,19 @@ class GaussModel(torch.nn.Module):
     @torch.no_grad()
     def visualize_points(self, xys, batch, mdp_dapi_image, post_th, rna_class, rna_name):
         points_xy = xys.cpu().numpy()
-        max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
-        max_color_post = max_color_post.max(dim=-1)[0]
-        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
         mdp_dapi_image = mdp_dapi_image.cpu().numpy()
         mdp_image = batch.max(dim=-1)[0].cpu().numpy()
 
-        cos_score, ref_score, _, _, max_color = self.obtain_calibration(rna_class, rna_name)
+        max_color = self.colors.max(dim=-1)[0]
+        max_color = max_color / (max_color.max() + 1e-8)
+
+        max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+
+        cos_score = self.obtain_calibration(rna_class, rna_name)[0]
+
+        ref_score = cos_score * max_color_post
         
         view_on_image = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=max_color.cpu().numpy())
         view_on_image_post = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=max_color_post.cpu().numpy())
