@@ -76,7 +76,7 @@ def main():
         precision="32-true",
         log_every_n_steps=50,
         strategy="auto",
-        val_check_interval=1000,
+        val_check_interval=2000,
         enable_model_summary=False,
         num_sanity_val_steps=1,
     )

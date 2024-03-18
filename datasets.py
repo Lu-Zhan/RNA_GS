@@ -6,7 +6,6 @@ import torchvision.transforms as transforms
 from PIL import Image
 from pathlib import Path
 from torch.utils.data import Dataset
-from torch.nn.functional import grid_sample
 
 class RNADataset(Dataset):
     def __init__(self, hparams, mode='train'):  
@@ -113,23 +112,6 @@ def draw_histogram(image, name):
               f' O: mean: {image.mean():.2f} std: {image.std():.2f}')
 
     plt.savefig(name)
-
-
-def obtain_init_color(input_xys, hw, image):
-    # input_xys: [N, 2]
-    # hw: [H, W]
-    # image: [H, W, 15]
-
-    input_coords = input_xys / torch.tensor(hw, dtype=input_xys.dtype, device=input_xys.device).reshape(1, 2)
-    input_coords = (input_coords - 0.5) * 2
-    input_coords = input_coords[None, None, ...] # [1, 1, N, 2]
-
-    image = image.permute(2, 0, 1)[None, ...] # (1, 15, H, W)
-
-    # (1, 15, H, W), (1, 1, N, 2) -> (1, 15, 1, N)
-    color = grid_sample(image, input_coords, align_corners=True) # (1, 15, 1, N)
-
-    return color[0, :, 0, :].permute(1, 0) # (N, 15)
 
 
 if __name__ == "__main__":

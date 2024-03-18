@@ -11,7 +11,7 @@ from gsplat.rasterize import rasterize_gaussians
 
 from losses import *
 from visualize import view_recon, view_positions
-from utils import calculate_mdp_psnr, read_codebook
+from utils import read_codebook, filter_by_background
 from models import model_zoo
 
 
@@ -37,8 +37,11 @@ class GSSystem(LightningModule):
             device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
         )
 
-        self.codebook = read_codebook(self.hparams['data']['codebook_path'], bg=True)
-        self.codebook = torch.tensor(self.codebook, device=self.gs_model.means_3d.device)
+        self.rna_class, self.rna_name = read_codebook(
+            path = self.hparams['data']['codebook_path'], 
+            bg=hparams['loss']['w_mi'] > 0,
+        )
+        self.rna_class = torch.tensor(self.rna_class, device=self.gs_model.means_3d.device)
 
         self.dapi_images = kwargs.get('dapi_images', None)
         try:
@@ -148,10 +151,10 @@ class GSSystem(LightningModule):
             self.log_step("train/loss_mdp_bg_l1", loss_mdp_bg_l1)
         
         pred_code = self.gs_model.colors
-        loss_mi = mi_loss(pred_code, self.codebook)
+        loss_mi = mi_loss(pred_code, self.rna_class)
         self.log_step("train/loss_mi", loss_mi)
 
-        loss_cos = cos_loss(pred_code, self.codebook)
+        loss_cos = cos_loss(pred_code, self.rna_class)
         self.log_step("train/loss_cos", loss_cos)
 
         if self.hparams['loss']['w_mi'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
@@ -193,23 +196,29 @@ class GSSystem(LightningModule):
             self.logger.experiment.log({"val_image": [wandb.Image(recon_image, caption="val_image")]}, step=self.global_step)
         
         if self.global_step % 10000 == 0:
-            position_on_dapi_image = view_positions(
-                points_xy=xys.detach().cpu().numpy(), 
-                bg_image=self.mdp_dapi_image.cpu().numpy(),
-                alpha=self.gs_model.colors.cpu().numpy(),
-            )
+            points_xy = xys.detach().cpu().numpy()
+            pred_color = self.gs_model.colors.cpu().numpy()
+            pred_color_post = self.gs_model.post_colors(xys,  batch, th=self.hparams['process']['bg_filter_th']).cpu().numpy()
+            mdp_dapi_image = self.mdp_dapi_image.cpu().numpy()
+            mdp_image = batch.max(dim=-1)[0].cpu().numpy()
+
+            position_on_dapi_image = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color)
             position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
-            position_on_mdp_image = view_positions(
-                points_xy=xys.detach().cpu().numpy(),
-                bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-                alpha=self.gs_model.colors.cpu().numpy(),
-            )
+            position_on_dapi_image_post = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color_post)
+            position_on_dapi_image_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
+
+            position_on_mdp_image = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color)
             position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
+
+            position_on_mdp_image_post = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color_post)
+            position_on_mdp_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
 
             self.logger.experiment.log({"positions": [
                 wandb.Image(position_on_dapi_image, caption="dapi"),
                 wandb.Image(position_on_mdp_image, caption="mdp"),
+                wandb.Image(position_on_dapi_image_post, caption="dapi_post"),
+                wandb.Image(position_on_mdp_image_post, caption="mdp_post"),
             ]})
 
         if self.hparams['model']['save_gif'] == 1 and self.global_step == self.hparams['train']['iterations']:
@@ -232,30 +241,37 @@ class GSSystem(LightningModule):
         mdp_psnr = calculate_mdp_psnr(output, batch)
         print(f'mean_psnr: {mean_psnr:.4f}, mdp_psnr: {mdp_psnr:.4f}')
 
-        # visualization
+        # visualize recon
         recon_image = view_recon(pred=output, gt=batch, resize=(576, 576))
         recon_image = Image.fromarray(recon_image)
 
         recon_image.save(os.path.join(self.save_folder, f"recon.png"))
+        
+        # visualize points
+        points_xy = xys.detach().cpu().numpy()
+        pred_color = self.gs_model.colors.cpu().numpy()
+        pred_color_post = self.gs_model.post_colors(xys,  batch, th=self.hparams['process']['bg_filter_th']).cpu().numpy()
+        mdp_dapi_image = self.mdp_dapi_image.cpu().numpy()
+        mdp_image = batch.max(dim=-1)[0].cpu().numpy()
 
-        position_on_dapi_image = view_positions(
-            points_xy=xys.detach().cpu().numpy(), 
-            bg_image=self.mdp_dapi_image.cpu().numpy(),
-            alpha=self.gs_model.colors.cpu().numpy(),
-        )
+        position_on_dapi_image = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color)
         position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
 
-        position_on_mdp_image = view_positions(
-            points_xy=xys.detach().cpu().numpy(), 
-            bg_image=batch.max(dim=-1)[0].cpu().numpy(),
-            alpha=self.gs_model.colors.cpu().numpy(),
-        )
+        position_on_dapi_image_post = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color_post)
+        position_on_dapi_image_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
+
+        position_on_mdp_image = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color)
         position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
+
+        position_on_mdp_image_post = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color_post)
+        position_on_mdp_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
         
         try:
             self.logger.experiment.log({"positions": [
                 wandb.Image(position_on_dapi_image, caption="dapi"),
                 wandb.Image(position_on_mdp_image, caption="mdp"),
+                wandb.Image(position_on_dapi_image_post, caption="dapi_post"),
+                wandb.Image(position_on_mdp_image_post, caption="mdp_post"),
             ]})
         except:
             print("wandb not available")

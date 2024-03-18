@@ -1,7 +1,7 @@
 import math
 import torch
 
-from datasets import obtain_init_color
+from utils import obtain_init_color, filter_by_background
 
 class GaussModel(torch.nn.Module):
     def __init__(self, num_primarys, num_backups, hw, device):
@@ -129,6 +129,19 @@ class GaussModel(torch.nn.Module):
 
         # y = 1 / (1 + exp(-x)), exp(-x) = 1 / y - 1, x = - log(1 / y - 1)
         self.rgbs.data = - torch.log(1 / (color * (1 - 2e-8) + 1e-8) - 1)
+
+    def post_colors(self, xys, gt_images, th=0.05):
+        processed_colors = filter_by_background(
+            xys=xys,
+            colors=self.colors,
+            hw=[self.H, self.W],
+            image=gt_images,
+            th=th,
+        )
+
+        return processed_colors
+
+        
 
 
 class FixGaussModel(GaussModel):

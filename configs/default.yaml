@@ -1,4 +1,4 @@
-exp_name: baseline_low_color_bias=0.01_init_rgb=1_fix0
+exp_name: baseline_low_color_bias=0.01_init_rgb=1
 
 train:
   lr: 0.005
@@ -31,7 +31,10 @@ loss:
   w_rho: 0
   w_radius: 0
   w_mi: 0
-  w_cos: 0.001
+  w_cos: 0
+
+process:
+  bg_filter_th: 0.05
 
 data:
   # data_path: ../data/IM41340_full/IM41340regi/2/0_4

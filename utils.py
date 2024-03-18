@@ -11,10 +11,8 @@ from typing import Optional
 import argparse
 
 import matplotlib.pyplot as plt
-# from losses import obtain_sigma_xy
-from gsplat.project_gaussians import project_gaussians
-from gsplat.rasterize import rasterize_gaussians
-from preprocess import images_to_tensor
+
+from torch.nn.functional import grid_sample
 
 
 def read_codebook(path, bg=False):
@@ -24,56 +22,54 @@ def read_codebook(path, bg=False):
     )  # array(["'Acta2'", 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0], dtype=object)
 
     codebook = [np.array(x[1:], dtype=np.float32) for x in array]
+    rna_name = [x[0] for x in array]
+
     if bg:
         codebook = [np.zeros(15, dtype=np.float32)] + codebook
+        rna_name = ["background"] + rna_name
+        print("Add background to codebook")
 
-    return np.stack(codebook, axis=0)  # (181/182, 15)
-
-
-# (zwx) PSNR after maximum density projection
-def calculate_mdp_psnr(img, gt_img):
-    MDP_img = img.max(axis = 2).values
-    MDP_gt_img = gt_img.max(axis = 2).values
-    mse_loss = torch.nn.MSELoss()
-    mse = mse_loss(MDP_img, MDP_gt_img)
-    MDP_PSNR =  float(10 * torch.log10(1 / mse))
-    return MDP_PSNR
-
-# def read_codebook_name(path):
-#     data_frame = pd.read_excel(path)
-#     column_data = data_frame.iloc[0:, 0].astype(str).values
-#     return column_data
+    return np.stack(codebook, axis=0), rna_name
 
 
-# def get_index_cos(pred_code, codebook):
-#     simi = pred_code @ codebook.T  # (num_samples, 15) @ (15, 181) = (num_samples, 181)
+def obtain_init_color(input_xys, hw, image):
+    # input_xys: [N, 2]
+    # hw: [H, W]
+    # image: [H, W, 15]
 
-#     # (n, 181) / (n, 1) / (1, 181)
-#     simi = (
-#         simi
-#         / torch.norm(pred_code, dim=-1, keepdim=True)
-#         / torch.norm(codebook, dim=-1, keepdim=True).T
-#     )
+    input_coords = input_xys / torch.tensor(hw, dtype=input_xys.dtype, device=input_xys.device).reshape(1, 2)
+    input_coords = (input_coords - 0.5) * 2
+    input_coords = input_coords[None, None, ...] # [1, 1, N, 2]
 
-#     max_value, index = torch.max(simi, dim=-1)  # (num_samples, )
+    image = image.permute(2, 0, 1)[None, ...] # (1, 15, H, W)
 
-#     max_value = (max_value + 1) / 2
+    # (1, 15, H, W), (1, 1, N, 2) -> (1, 15, 1, N)
+    color = grid_sample(image, input_coords, align_corners=True) # (1, 15, 1, N)
 
-#     return max_value, index
+    return color[0, :, 0, :].permute(1, 0) # (N, 15)
 
 
-# #(gzx):读入的codebook_path
-# def write_to_csv(
-#         pixel_coords,
-#         alpha, 
-#         save_path,
-#         h, w,
-#         image,
-#         ref=None,
-#         post_processing=False,
-#         pos_threshold=20,
-#         codebook_path='data/codebook.xlsx'
-#     ):
+def filter_by_background(xys, colors, hw, image, th=0.05):
+    gt_color = obtain_init_color(xys, hw, image) # (N, 15)
+    weight_color = gt_color.max(dim=-1, keepdim=True)[0] # (N, 1)
+
+    weight_color = (weight_color - th > 0).to(gt_color.dtype) # (N, 1)
+    colors = colors * weight_color
+
+    return colors
+
+
+def write_to_csv(
+        xys,
+        cos_simi, 
+        save_path,
+        image,
+        ref=None,
+        post_processing=False,
+        pos_threshold=0.01,
+    ):
+
+    pass
 
 #     codebook = read_codebook(path=codebook_path)
 #     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
@@ -155,6 +151,32 @@ def calculate_mdp_psnr(img, gt_img):
 #             scores,
 #             save_path.replace(".csv", f"_post{pos_threshold}.png"),
 #         )
+
+
+# def read_codebook_name(path):
+#     data_frame = pd.read_excel(path)
+#     column_data = data_frame.iloc[0:, 0].astype(str).values
+#     return column_data
+
+
+# def get_index_cos(pred_code, codebook):
+#     simi = pred_code @ codebook.T  # (num_samples, 15) @ (15, 181) = (num_samples, 181)
+
+#     # (n, 181) / (n, 1) / (1, 181)
+#     simi = (
+#         simi
+#         / torch.norm(pred_code, dim=-1, keepdim=True)
+#         / torch.norm(codebook, dim=-1, keepdim=True).T
+#     )
+
+#     max_value, index = torch.max(simi, dim=-1)  # (num_samples, )
+
+#     max_value = (max_value + 1) / 2
+
+#     return max_value, index
+
+
+
 
 # # cyy: 增加从ckpt读取并输出csv
 # # usage: load_ckpt_write_to_csv(ckpt_path='outputs/ablation_baseline',img_path=Path("data/1213_demo_data_v2/raw1"),codebook_path=Path("data/codebook.xlsx"))
