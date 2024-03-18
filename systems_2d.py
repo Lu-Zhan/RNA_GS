@@ -10,8 +10,8 @@ from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
 from losses import *
-from visualize import view_recon, view_positions
-from utils import read_codebook, filter_by_background
+from visualize import view_recon
+from utils import read_codebook
 from models import model_zoo
 
 
@@ -196,30 +196,33 @@ class GSSystem(LightningModule):
             self.logger.experiment.log({"val_image": [wandb.Image(recon_image, caption="val_image")]}, step=self.global_step)
         
         if self.global_step % 10000 == 0:
-            points_xy = xys.detach().cpu().numpy()
-            pred_color = self.gs_model.colors.cpu().numpy()
-            pred_color_post = self.gs_model.post_colors(xys,  batch, th=self.hparams['process']['bg_filter_th']).cpu().numpy()
-            mdp_dapi_image = self.mdp_dapi_image.cpu().numpy()
-            mdp_image = batch.max(dim=-1)[0].cpu().numpy()
+            view_on_dapi, view_on_dapi_post, view_on_image, view_on_image_post = self.gs_model.visualize_points(
+                xys=xys, 
+                batch=batch,
+                mdp_dapi_image=self.mdp_dapi_image,
+                post_th=self.hparams['process']['bg_filter_th'],
+            )
 
-            position_on_dapi_image = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color)
-            position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
-
-            position_on_dapi_image_post = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color_post)
-            position_on_dapi_image_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
-
-            position_on_mdp_image = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color)
-            position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
-
-            position_on_mdp_image_post = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color_post)
-            position_on_mdp_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
+            view_on_dapi.save(os.path.join(self.save_folder, f"positions_dapi.png"))
+            view_on_dapi_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
+            view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
+            view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
 
             self.logger.experiment.log({"positions": [
-                wandb.Image(position_on_dapi_image, caption="dapi"),
-                wandb.Image(position_on_mdp_image, caption="mdp"),
-                wandb.Image(position_on_dapi_image_post, caption="dapi_post"),
-                wandb.Image(position_on_mdp_image_post, caption="mdp_post"),
+                wandb.Image(view_on_dapi, caption="dapi"),
+                wandb.Image(view_on_image, caption="mdp"),
+                wandb.Image(view_on_dapi_post, caption="dapi_post"),
+                wandb.Image(view_on_image_post, caption="mdp_post"),
             ]})
+
+            if self.global_step > 0:
+                self.gs_model.save_to_csv(
+                    xys=xys,
+                    rna_class=self.rna_class, 
+                    rna_name=self.rna_name,
+                    hw=self.hparams['hw'],
+                    path=os.path.join(self.save_folder, "results.csv"),
+                )
 
         if self.hparams['model']['save_gif'] == 1 and self.global_step == self.hparams['train']['iterations']:
             frames = [Image.fromarray(x) for x in self.frames]
@@ -248,33 +251,39 @@ class GSSystem(LightningModule):
         recon_image.save(os.path.join(self.save_folder, f"recon.png"))
         
         # visualize points
-        points_xy = xys.detach().cpu().numpy()
-        pred_color = self.gs_model.colors.cpu().numpy()
-        pred_color_post = self.gs_model.post_colors(xys,  batch, th=self.hparams['process']['bg_filter_th']).cpu().numpy()
-        mdp_dapi_image = self.mdp_dapi_image.cpu().numpy()
-        mdp_image = batch.max(dim=-1)[0].cpu().numpy()
+        view_on_dapi, view_on_dapi_post, view_on_image, view_on_image_post = self.gs_model.visualize_points(
+            xys=xys, 
+            batch=batch,
+            mdp_dapi_image=self.mdp_dapi_image,
+            post_th=self.hparams['process']['bg_filter_th'],
+        )
 
-        position_on_dapi_image = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color)
-        position_on_dapi_image.save(os.path.join(self.save_folder, f"positions_dapi.png"))
-
-        position_on_dapi_image_post = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=pred_color_post)
-        position_on_dapi_image_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
-
-        position_on_mdp_image = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color)
-        position_on_mdp_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
-
-        position_on_mdp_image_post = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=pred_color_post)
-        position_on_mdp_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
+        view_on_dapi.save(os.path.join(self.save_folder, f"positions_dapi.png"))
+        view_on_dapi_post.save(os.path.join(self.save_folder, f"positions_dapi_post.png"))
+        view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
+        view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
         
         try:
-            self.logger.experiment.log({"positions": [
-                wandb.Image(position_on_dapi_image, caption="dapi"),
-                wandb.Image(position_on_mdp_image, caption="mdp"),
-                wandb.Image(position_on_dapi_image_post, caption="dapi_post"),
-                wandb.Image(position_on_mdp_image_post, caption="mdp_post"),
-            ]})
+            self.logger.experiment.log({
+                "positions": [
+                    wandb.Image(view_on_dapi, caption="dapi"),
+                    wandb.Image(view_on_image, caption="mdp"),
+                    wandb.Image(view_on_dapi_post, caption="dapi_post"),
+                    wandb.Image(view_on_image_post, caption="mdp_post"),
+                ],
+                "recon": wandb.Image(recon_image, caption="recon"),
+            })
         except:
             print("wandb not available")
+        
+        # save to csv
+        self.gs_model.save_to_csv(
+            xys=xys,
+            rna_class=self.rna_class, 
+            rna_name=self.rna_name,
+            hw=self.hparams['hw'],
+            path=os.path.join(self.save_folder, "results.csv"),
+        )
 
         return 1
 

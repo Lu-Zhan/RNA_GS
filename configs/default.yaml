@@ -1,4 +1,4 @@
-exp_name: baseline_low_color_bias=0.01_init_rgb=1
+exp_name: bl_low_color_bias=0.01_init_rgb=1
 
 train:
   lr: 0.005

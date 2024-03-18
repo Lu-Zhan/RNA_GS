@@ -29,7 +29,7 @@ def read_codebook(path, bg=False):
         rna_name = ["background"] + rna_name
         print("Add background to codebook")
 
-    return np.stack(codebook, axis=0), rna_name
+    return np.stack(codebook, axis=0), np.array(rna_name)
 
 
 def obtain_init_color(input_xys, hw, image):
@@ -59,17 +59,26 @@ def filter_by_background(xys, colors, hw, image, th=0.05):
     return colors
 
 
-def write_to_csv(
-        xys,
-        cos_simi, 
-        save_path,
-        image,
-        ref=None,
-        post_processing=False,
-        pos_threshold=0.01,
-    ):
+def write_to_csv(xys, scores, hw, rna_index, rna_name, path):
+    mask = (xys[:, 0] >= 0) & (xys[:, 0] < hw[0]) & (xys[:, 1] >= 0) & (xys[:, 1] < hw[1])
+    xys = xys[mask]
 
-    pass
+    xys = torch.round(xys).to(torch.int16)
+    px = xys[:, 0].cpu().numpy()
+    py = xys[:, 1].cpu().numpy()
+
+    scores = scores[mask].cpu().numpy() # (n, k)
+    rna_index = rna_index[mask].cpu().numpy()
+    rna_name = rna_name[mask.cpu().numpy()]
+
+    df = pd.DataFrame({
+        "x": px, "y": py, "index": rna_index, "rna": rna_name, 
+        "score": scores[:, 0], "cos_score": scores[:, 1], "max_color": scores[:, 2],
+    })
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    df.to_csv(path, index=False)
+
 
 #     codebook = read_codebook(path=codebook_path)
 #     codebook = torch.tensor(codebook, device=alpha.device, dtype=alpha.dtype)
