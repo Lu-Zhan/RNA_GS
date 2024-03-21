@@ -37,11 +37,11 @@ class GSSystem(LightningModule):
             device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
         )
 
-        self.rna_class, self.rna_name = read_codebook(
-            path = self.hparams['data']['codebook_path'], 
-            bg=hparams['loss']['w_mi'] > 0,
-        )
+        self.rna_class, self.rna_name = read_codebook(path = self.hparams['data']['codebook_path'], bg=False)
         self.rna_class = torch.tensor(self.rna_class, device=self.gs_model.means_3d.device)
+
+        self.mi_rna_class, self.mi_rna_name = read_codebook(path = self.hparams['data']['codebook_path'], bg=True)
+        self.mi_rna_class = torch.tensor(self.mi_rna_class, device=self.gs_model.means_3d.device)
 
         self.dapi_images = kwargs.get('dapi_images', None)
         try:
@@ -151,7 +151,7 @@ class GSSystem(LightningModule):
             self.log_step("train/loss_mdp_bg_l1", loss_mdp_bg_l1)
         
         pred_code = self.gs_model.colors
-        loss_mi = mi_loss(pred_code, self.rna_class)
+        loss_mi = mi_loss(pred_code, self.mi_rna_class)
         self.log_step("train/loss_mi", loss_mi)
 
         loss_cos = cos_loss(pred_code, self.rna_class)

@@ -56,10 +56,10 @@ def main():
 
     # model & dataloader
     train_dataset = RNADataset(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=27)
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=8)
 
     val_dataset = RNADataset(hparams=config, mode='val')
-    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=27)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range
