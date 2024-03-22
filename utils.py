@@ -59,7 +59,7 @@ def filter_by_background(xys, colors, hw, image, th=0.05):
     return colors
 
 
-def write_to_csv(xys, scores, hw, rna_index, rna_name, path, score_th=1):
+def write_to_csv(xys, scores, hw, rna_index, rna_name, path, score_th=0): #default 0
     mask = (xys[:, 0] >= 0) & (xys[:, 0] < hw[0]) & (xys[:, 1] >= 0) & (xys[:, 1] < hw[1])
     mask = mask & (scores[:, 0] > score_th)
 
