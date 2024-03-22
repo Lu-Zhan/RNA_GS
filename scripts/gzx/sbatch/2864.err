@@ -1,0 +1,61 @@
+[rank: 0] Seed set to 42
+wandb: WARNING `resume` will be ignored since W&B syncing is set to `offline`. Starting a new run with run id mci141ic.
+wandb: Tracking run with wandb version 0.16.2
+wandb: W&B syncing is set to `offline` in this directory.  
+wandb: Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+/home/home/ccnt_zq/gzx/.conda/envs/mrna/lib/python3.11/site-packages/torch/utils/data/dataloader.py:558: UserWarning: This DataLoader will create 8 worker processes in total. Our suggested max number of worker in current system is 2, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+/home/home/ccnt_zq/gzx/.conda/envs/mrna/lib/python3.11/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python train_2d.py --exp_name l2 --config ./configs/default ...
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+/home/home/ccnt_zq/gzx/.conda/envs/mrna/lib/python3.11/site-packages/torch/utils/data/dataloader.py:558: UserWarning: This DataLoader will create 8 worker processes in total. Our suggested max number of worker in current system is 2, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+/home/home/ccnt_zq/gzx/.conda/envs/mrna/lib/python3.11/site-packages/torch/utils/data/dataloader.py:558: UserWarning: This DataLoader will create 8 worker processes in total. Our suggested max number of worker in current system is 2, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+`Trainer.fit` stopped: `max_steps=2000` reached.
+/home/home/ccnt_zq/gzx/.conda/envs/mrna/lib/python3.11/site-packages/lightning/pytorch/core/saving.py:94: The state dict in '/home/home/ccnt_zq/gzx/code/mRNA/new/RNA_GS_0315/outputs/mci141ic/checkpoints/psnr=20.5153.ckpt' contains no parameters.
+/home/home/ccnt_zq/gzx/.conda/envs/mrna/lib/python3.11/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python train_2d.py --exp_name l2 --config ./configs/default ...
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+/home/home/ccnt_zq/gzx/.conda/envs/mrna/lib/python3.11/site-packages/torch/utils/data/dataloader.py:558: UserWarning: This DataLoader will create 8 worker processes in total. Our suggested max number of worker in current system is 2, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+wandb: 
+wandb: Run history:
+wandb:                    epoch ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                params/lr ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:       params/num_samples ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:         train/loss_bg_l1 ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:           train/loss_cos █▆▅▅▄▄▄▄▄▃▃▃▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            train/loss_l2 █▆▆▅▅▅▄▄▄▃▃▃▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:     train/loss_masked_l1 █▆▆▅▅▄▄▄▃▃▃▃▃▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:     train/loss_mdp_bg_l1 ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:        train/loss_mdp_l2 █▄▃▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: train/loss_mdp_masked_l1 █▅▄▃▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            train/loss_mi ▁▂▂▃▃▃▃▃▄▄▄▅▅▆▆▆▆▆▆▆▆▆▆▆▇▇▇▇▇▇▇▇▇███████
+wandb:         train/total_loss █▅▄▄▃▃▃▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:      trainer/global_step ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇████
+wandb:             val/mdp_psnr ▁
+wandb:            val/mean_psnr ▁
+wandb: 
+wandb: Run summary:
+wandb:                    epoch 0
+wandb:                params/lr 0.005
+wandb:       params/num_samples 8000.0
+wandb:         train/loss_bg_l1 0.0
+wandb:           train/loss_cos 0.23451
+wandb:            train/loss_l2 0.00915
+wandb:     train/loss_masked_l1 0.03207
+wandb:     train/loss_mdp_bg_l1 0.0
+wandb:        train/loss_mdp_l2 0.00325
+wandb: train/loss_mdp_masked_l1 0.02509
+wandb:            train/loss_mi 4.69576
+wandb:         train/total_loss 0.06956
+wandb:      trainer/global_step 1999
+wandb:             val/mdp_psnr 25.04476
+wandb:            val/mean_psnr 20.51532
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync outputs/wandb/offline-run-20240322_154449-mci141ic
+wandb: Find logs at: outputs/wandb/offline-run-20240322_154449-mci141ic/logs
