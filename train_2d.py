@@ -3,7 +3,6 @@ import yaml
 import torch
 import logging
 logging.getLogger('lightning').setLevel(0)
-
 from pathlib import Path
 from argparse import ArgumentParser, REMAINDER
 from lightning.pytorch import Trainer, seed_everything
@@ -39,7 +38,7 @@ def main():
         save_dir=config['exp_dir'],
     )
 
-    ckpt_path = os.path.join(logger.save_dir, logger.experiment.id, 'checkpoints')
+    ckpt_path = os.path.join(logger.save_dir, config['exp_name'], 'checkpoints')
     os.makedirs(ckpt_path, exist_ok=True)
     config['exp_dir'] = os.path.dirname(ckpt_path)
 

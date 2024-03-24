@@ -37,10 +37,10 @@ process:
   bg_filter_th: 0.05
 
 data:
-  data_path: ../data/IM41340_full/IM41340regi
+  data_path: data/IM41340_tiled/1_36
   # data_path: ../data/IM41340_full/IM41340regi/2/3_4
   # data_path: ../data/IM41340_tiled/1_36
-  codebook_path: ../data/codebook.xlsx
+  codebook_path: data/codebook.xlsx
 
 model:
   checkpoint_path: checkpoints
