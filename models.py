@@ -1,6 +1,7 @@
 import os
 import math
 import torch
+import numpy as np
 
 from utils import obtain_init_color, filter_by_background, write_to_csv
 from visualize import view_positions
@@ -173,7 +174,10 @@ class GaussModel(torch.nn.Module):
         )
 
     @torch.no_grad()
-    def visualize_points(self, xys, batch, mdp_dapi_image, post_th, rna_class, rna_name):
+    def visualize_points(
+            self, xys, batch, mdp_dapi_image, post_th, rna_class, rna_name, 
+            selected_classes=['Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'plp1', 'MBP', 'Aqp4', 'Rgs5']
+        ):
         points_xy = xys.cpu().numpy()
         mdp_dapi_image = mdp_dapi_image.cpu().numpy()
         mdp_image = batch.max(dim=-1)[0].cpu().numpy()
@@ -185,7 +189,7 @@ class GaussModel(torch.nn.Module):
         max_color_post = max_color_post.max(dim=-1)[0]
         max_color_post = max_color_post / (max_color_post.max() + 1e-8)
 
-        cos_score = self.obtain_calibration(rna_class, rna_name)[0]
+        cos_score, _, pred_class_name = self.obtain_calibration(rna_class, rna_name)
 
         ref_score = cos_score * max_color_post
         
@@ -194,12 +198,26 @@ class GaussModel(torch.nn.Module):
         view_on_image_cos = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=cos_score.cpu().numpy())
         view_on_image_ref = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=ref_score.cpu().numpy())
 
+        # show selected rna classes
+        view_classes = []
+        for selected_class in selected_classes:
+            selected_index = np.where(pred_class_name == selected_class)[0]
+            
+            # if len(selected_index) > 0:
+            selected_points = points_xy[selected_index]
+            selected_ref_score = ref_score[selected_index]
+
+            view_specific = view_positions(points_xy=selected_points, bg_image=mdp_image, alpha=selected_ref_score.cpu().numpy())
+            # else:
+            #     view_specific = mdp_image
+            view_classes.append(view_specific)
+
         # view_on_dapi = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=max_color)
         # view_on_dapi_post = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=max_color_post)
         # view_on_dapi_cos = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=cos_score)
         # view_on_dapi_ref = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=ref_score)
 
-        return view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref
+        return view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes
 
 class FixGaussModel(GaussModel):
     def obtain_data(self):

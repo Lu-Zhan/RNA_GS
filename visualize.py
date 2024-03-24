@@ -6,6 +6,20 @@ from torch.nn.functional import interpolate
 
 
 def view_positions(points_xy, bg_image, alpha=1):
+    if len(points_xy) == 0:
+        fig, ax = plt.subplots()
+        ax.imshow(bg_image, cmap="gray")
+        ax.axis("off")
+
+        plt.title(f"No points")
+        plt.tight_layout()
+        fig.canvas.draw()
+
+        data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+        plt.close()
+
+        return Image.fromarray(data)
     # points_xy: [n, 2], bg_image: [h, w, 1], alpha: [n, 15]
     
     # select points within the image

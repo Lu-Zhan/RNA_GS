@@ -1,4 +1,4 @@
-exp_name: full_bl
+exp_name: full_class_vis
 
 train:
   lr: 0.005
@@ -45,3 +45,14 @@ data:
 model:
   checkpoint_path: checkpoints
   save_gif: 0
+
+view:
+  classes:
+  - 'Snap25'
+  - 'Slc17a7'
+  - 'Gad1'
+  - 'Gad2'
+  - 'plp1'
+  - 'MBP'
+  - 'Aqp4'
+  - 'Rgs5'
