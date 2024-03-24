@@ -5,13 +5,13 @@ from PIL import Image
 from torch.nn.functional import interpolate
 
 
-def view_positions(points_xy, bg_image, alpha=1):
+def view_positions(points_xy, bg_image, alpha=1, s=1, prefix=""):
     if len(points_xy) == 0:
         fig, ax = plt.subplots()
         ax.imshow(bg_image, cmap="gray")
         ax.axis("off")
 
-        plt.title(f"No points")
+        plt.title(f"{prefix}No points")
         plt.tight_layout()
         fig.canvas.draw()
 
@@ -32,9 +32,9 @@ def view_positions(points_xy, bg_image, alpha=1):
 
     fig, ax = plt.subplots()
     ax.imshow(bg_image, cmap="gray")
-    ax.scatter(points_xy[:, 0], points_xy[:, 1], c="r", s=1, alpha=alpha)
+    ax.scatter(points_xy[:, 0], points_xy[:, 1], c="r", s=s, alpha=alpha)
     ax.axis("off")
-    plt.title(f"Points: {len(points_xy)}, top0.9: {len(alpha[alpha > 0.8])}, top0.7: {len(alpha[alpha > 0.5])}, top0.5: {len(alpha[alpha > 0.2])}")
+    plt.title(f"{prefix}Points: {len(points_xy)}, top0.9: {len(alpha[alpha > 0.8])}, top0.7: {len(alpha[alpha > 0.5])}, top0.5: {len(alpha[alpha > 0.2])}")
 
     plt.tight_layout()
     # plt.subplots_adjust(

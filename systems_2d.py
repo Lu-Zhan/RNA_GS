@@ -211,8 +211,9 @@ class GSSystem(LightningModule):
             view_on_image_cos.save(os.path.join(self.save_folder, f"positions_mdp_cos.png"))
             view_on_image_ref.save(os.path.join(self.save_folder, f"positions_mdp_ref.png"))
 
+            os.makedirs(os.path.join(self.save_folder, 'classes'), exist_ok=True)
             for i, view_class in enumerate(view_classes):
-                view_class.save(os.path.join(self.save_folder, f"positions_class_{self.hparams['view']['classes'][i]}.png"))
+                view_class.save(os.path.join(self.save_folder, 'classes', f"positions_class_{self.hparams['view']['classes'][i]}.png"))
             
             self.logger.experiment.log({
                 "positions": [
@@ -283,8 +284,15 @@ class GSSystem(LightningModule):
         view_on_image_cos.save(os.path.join(self.save_folder, f"positions_mdp_cos.png"))
         view_on_image_ref.save(os.path.join(self.save_folder, f"positions_mdp_ref.png"))
 
+        os.makedirs(os.path.join(self.save_folder, 'classes'), exist_ok=True)
         for i, view_class in enumerate(view_classes):
-            view_class.save(os.path.join(self.save_folder, f"positions_class_{self.hparams['view']['classes'][i]}.png"))
+            view_class.save(os.path.join(self.save_folder, 'classes', f"positions_class_{self.hparams['view']['classes'][i]}.png"))
+        
+        # merge all images
+        view_classes = [np.array(x) for x in view_classes]  # [(h, w, 3) * 8]
+        view_classes = np.concatenate(view_classes, axis=1) # (h, 8w, 3)
+        view_classes = Image.fromarray(view_classes)
+        view_classes.save(os.path.join(self.save_folder, f"positions_classes.png"))
         
         try:
             self.logger.experiment.log({

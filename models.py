@@ -207,9 +207,14 @@ class GaussModel(torch.nn.Module):
             selected_points = points_xy[selected_index]
             selected_ref_score = ref_score[selected_index]
 
-            view_specific = view_positions(points_xy=selected_points, bg_image=mdp_image, alpha=selected_ref_score.cpu().numpy())
-            # else:
-            #     view_specific = mdp_image
+            # hanming weight for selected class
+            hm_weight = int(rna_class[np.where(rna_name == selected_class)[0]].sum())
+
+            view_specific = view_positions(
+                points_xy=selected_points, bg_image=mdp_dapi_image, alpha=selected_ref_score.cpu().numpy(), 
+                s=3, prefix=f"{selected_class}-{hm_weight:01d}: "
+            )
+
             view_classes.append(view_specific)
 
         # view_on_dapi = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=max_color)
