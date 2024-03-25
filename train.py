@@ -35,7 +35,7 @@ def main():
     logger = WandbLogger(
         name=config['exp_name'],
         offline=False,
-        project='rna_cali_0311',
+        project='rna_cali_0320',
         save_dir=config['exp_dir'],
     )
 

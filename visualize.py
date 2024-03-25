@@ -67,17 +67,19 @@ def view_recon(pred, gt, resize=(192, 192)):
     # plt.subplots_adjust(top=1, bottom=0, left=0, right=1, wspace=0, hspace=0)
     # plt.margins(0, 0)
 
+    vmin = gt.ravel()[gt.ravel() > 0].min()
+    vmax = gt.ravel().max()
     # vmax = max(pred.max(), gt.max())
 
     for i in range(3):
         for j in range(5):
             # pred
-            axs[i * 2 + 1, j].imshow(pred[..., i * 5 + j], cmap="jet", interpolation="nearest") #, vmin=0, vmax=vmax) 
+            axs[i * 2 + 1, j].imshow(pred[..., i * 5 + j], cmap="jet", interpolation="nearest", vmin=vmin, vmax=vmax) 
             axs[i * 2 + 1, j].axis("off")
             axs[i * 2 + 1, j].set_title(f"Pred {i * 5 + j}")
 
             # gt
-            axs[i * 2, j].imshow(gt[..., i * 5 + j], cmap="jet", interpolation="nearest") #, vmin=0, vmax=vmax) 
+            axs[i * 2, j].imshow(gt[..., i * 5 + j], cmap="jet", interpolation="nearest", vmin=vmin, vmax=vmax) 
             axs[i * 2, j].axis("off")
             axs[i * 2, j].set_title(f"GT {i * 5 + j}")
 

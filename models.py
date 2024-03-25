@@ -28,12 +28,6 @@ class GaussModel(torch.nn.Module):
             self.rgbs,
             self.opacities,
         )
-
-    def save(self, path) -> None:
-        pass
-
-    def load(self, path) -> None:
-        pass
     
     def obtain_data(self):
         return (
@@ -172,7 +166,7 @@ class GaussModel(torch.nn.Module):
         cos_score = cos_score[mask]
         max_color_post = max_color_post[mask]
         pred_rna_index = pred_rna_index[mask]
-        pred_rna_name = pred_rna_name[mask]
+        pred_rna_name = pred_rna_name[mask.cpu().numpy()]
 
         write_to_csv(
             xys=xys,
@@ -226,11 +220,6 @@ class GaussModel(torch.nn.Module):
             )
 
             view_classes.append(view_specific)
-
-        # view_on_dapi = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=max_color)
-        # view_on_dapi_post = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=max_color_post)
-        # view_on_dapi_cos = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=cos_score)
-        # view_on_dapi_ref = view_positions(points_xy=points_xy, bg_image=mdp_dapi_image, alpha=ref_score)
 
         return view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes
 
