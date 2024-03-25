@@ -11,7 +11,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
-from systems_2d import GSSystem
+from systems import GSSystem
 from datasets import RNADataset
 
 torch.set_float32_matmul_precision('medium')

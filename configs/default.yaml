@@ -1,4 +1,4 @@
-exp_name: full_class_vis
+exp_name: full_cos=1e-2
 
 train:
   lr: 0.005
@@ -10,7 +10,7 @@ train:
   densification_interval: -2
   densification_th: 0.005
   model: fix_gauss
-  codebook_start: 5000
+  codebook_start: 0
   init_rgb: 1
   color_bias: 0.01
 
@@ -31,7 +31,7 @@ loss:
   w_rho: 0
   w_radius: 0
   w_mi: 0
-  w_cos: 0
+  w_cos: 0.001
 
 process:
   bg_filter_th: 0.05
@@ -52,7 +52,7 @@ view:
   - 'Slc17a7'
   - 'Gad1'
   - 'Gad2'
-  - 'plp1'
-  - 'MBP'
+  - 'Plp1'
+  - 'Mbp'
   - 'Aqp4'
   - 'Rgs5'

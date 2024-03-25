@@ -164,6 +164,16 @@ class GaussModel(torch.nn.Module):
 
         ref_score = cos_score * max_color_post
 
+        # filter out points with zero score
+        mask = ref_score > 0
+
+        xys = xys[mask]
+        ref_score = ref_score[mask]
+        cos_score = cos_score[mask]
+        max_color_post = max_color_post[mask]
+        pred_rna_index = pred_rna_index[mask]
+        pred_rna_name = pred_rna_name[mask]
+
         write_to_csv(
             xys=xys,
             scores=torch.stack([ref_score, cos_score, max_color_post], dim=-1),
@@ -176,7 +186,7 @@ class GaussModel(torch.nn.Module):
     @torch.no_grad()
     def visualize_points(
             self, xys, batch, mdp_dapi_image, post_th, rna_class, rna_name, 
-            selected_classes=['Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'plp1', 'MBP', 'Aqp4', 'Rgs5']
+            selected_classes=['Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'Plp1', 'Mbp', 'Aqp4', 'Rgs5']
         ):
         points_xy = xys.cpu().numpy()
         mdp_dapi_image = mdp_dapi_image.cpu().numpy()
