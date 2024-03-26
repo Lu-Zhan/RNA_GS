@@ -196,6 +196,15 @@ class GaussModel(torch.nn.Module):
         cos_score, _, pred_class_name = self.obtain_calibration(rna_class, rna_name)
 
         ref_score = cos_score * max_color_post
+
+        # filter out points with zero score
+        mask = ref_score > 0
+        pred_class_name = pred_class_name[mask.cpu().numpy()]
+        points_xy = points_xy[mask.cpu().numpy()]
+        ref_score = ref_score[mask]
+        cos_score = cos_score[mask]
+        max_color_post = max_color_post[mask]
+        max_color = max_color[mask]
         
         view_on_image = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=max_color.cpu().numpy())
         view_on_image_post = view_positions(points_xy=points_xy, bg_image=mdp_image, alpha=max_color_post.cpu().numpy())
@@ -222,6 +231,62 @@ class GaussModel(torch.nn.Module):
             view_classes.append(view_specific)
 
         return view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes
+    
+    @torch.no_grad()
+    def visualize_top_classes(
+            self, xys, batch, mdp_dapi_image, post_th, rna_class, rna_name, top_k=10,
+        ):
+        points_xy = xys.cpu().numpy()
+        mdp_dapi_image = mdp_dapi_image.cpu().numpy()
+
+        max_color = self.colors.max(dim=-1)[0]
+        max_color = max_color / (max_color.max() + 1e-8)
+
+        max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+
+        cos_score, _, pred_class_name = self.obtain_calibration(rna_class, rna_name)
+
+        ref_score = cos_score * max_color_post
+
+        # filter out points with zero score
+        mask = ref_score > 0
+        pred_class_name = pred_class_name[mask.cpu().numpy()]
+        points_xy = points_xy[mask.cpu().numpy()]
+        ref_score = ref_score[mask]
+
+        # count the sum number of each class and find top k classes
+        class_count = {}
+        for class_name in pred_class_name:
+            if class_name in class_count:
+                class_count[class_name] += 1
+            else:
+                class_count[class_name] = 1
+        
+        sorted_class_count = sorted(class_count.items(), key=lambda x: x[1], reverse=True)
+        selected_classes = [class_name for class_name, _ in sorted_class_count[:top_k]]
+
+        # show selected rna classes
+        view_classes = []
+        for selected_class in selected_classes:
+            selected_index = np.where(pred_class_name == selected_class)[0]
+            
+            # if len(selected_index) > 0:
+            selected_points = points_xy[selected_index]
+            selected_ref_score = ref_score[selected_index]
+
+            # hanming weight for selected class
+            hm_weight = int(rna_class[np.where(rna_name == selected_class)[0]].sum())
+
+            view_specific = view_positions(
+                points_xy=selected_points, bg_image=mdp_dapi_image, alpha=selected_ref_score.cpu().numpy(), 
+                s=3, prefix=f"{selected_class}-{hm_weight:01d}: "
+            )
+
+            view_classes.append(view_specific)
+
+        return view_classes, selected_classes
 
 class FixGaussModel(GaussModel):
     def obtain_data(self):

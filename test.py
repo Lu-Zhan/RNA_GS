@@ -24,7 +24,12 @@ def main():
 
     # model & dataloader
     gs_system = GSSystem.load_from_checkpoint(args.checkpoint_path)
-    gs_system.hparams['view'] = {'classes': ['Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'Plp1', 'Mbp', 'Aqp4', 'Rgs5']}
+    gs_system.hparams['view'] = {
+        'classes': [
+            'Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'Plp1', 'Mbp', 'Aqp4', 'Rgs5', 
+            'Agt', 'Chrm3', 'Dclk3', 'Necab1', 'Cspg5', 'Tnr', 'Pdgfrb', 'Anln', 'Gfap',
+        ]
+    }
 
     val_dataset = RNADataset(hparams=gs_system.hparams, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=27)

@@ -293,6 +293,21 @@ class GSSystem(LightningModule):
         view_classes = np.concatenate(view_classes, axis=1) # (h, 8w, 3)
         view_classes = Image.fromarray(view_classes)
         view_classes.save(os.path.join(self.save_folder, f"positions_classes.png"))
+
+        # show top k classes
+        top_classes, selected_classes = self.gs_model.visualize_top_classes(
+            xys=xys, 
+            batch=batch,
+            mdp_dapi_image=self.mdp_dapi_image,
+            post_th=self.hparams['process']['bg_filter_th'],
+            rna_class=self.rna_class, 
+            rna_name=self.rna_name,
+            top_k=10,
+        )
+
+        os.makedirs(os.path.join(self.save_folder, 'classes_top10'), exist_ok=True)
+        for i, selected_class in enumerate(top_classes):
+            selected_class.save(os.path.join(self.save_folder, 'classes_top10', f"positions_{i}_{selected_classes[i]}.png"))
         
         try:
             self.logger.experiment.log({

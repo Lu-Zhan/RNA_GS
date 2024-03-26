@@ -1,4 +1,4 @@
-exp_name: full
+exp_name: last_week
 
 train:
   lr: 0.005
@@ -12,7 +12,7 @@ train:
   model: fix_gauss
   codebook_start: 0
   init_rgb: 1
-  color_bias: 0.01
+  color_bias: 0
 
 loss:
   w_l1: 0
@@ -22,9 +22,9 @@ loss:
   w_masked_l2: 0
   w_bg_l2: 0
   w_mdp_l1: 0
-  w_mdp_masked_l1: 1
-  w_mdp_bg_l1: 1
-  w_mdp_l2: 1
+  w_mdp_masked_l1: 0
+  w_mdp_bg_l1: 0
+  w_mdp_l2: 0
   w_mdp_masked_l2: 0
   w_mdp_bg_l2: 0
 
@@ -34,12 +34,12 @@ loss:
   w_cos: 0
 
 process:
-  bg_filter_th: 0.1
+  bg_filter_th: -1
 
 data:
-  # data_path: ../data/IM41340_full/IM41340_raw/6/1_36
-  data_path: ../data/IM41340_full/IM41340_raw
-  # data_path: ../data/IM41340_full/IM41340regi
+  data_path: ../data/IM41340_full/IM41340_raw/6/1_36
+  # data_path: ../data/IM41340_full/IM41340_raw
+  data_path: ../data/IM41340_full/IM41340regi
   # data_path: ../data/IM41340_full/IM41340regi/2/3_4
   # data_path: ../data/IM41340_tiled/1_36
   codebook_path: ../data/codebook.xlsx
@@ -58,3 +58,12 @@ view:
   - 'Mbp'
   - 'Aqp4'
   - 'Rgs5'
+  - 'Agt'
+  - 'Chrm3'
+  - 'Dclk3'
+  - 'Necab1'
+  - 'Cspg5'
+  - 'Tnr'
+  - 'Pdgfrb'
+  - 'Anln'
+  - 'Gfap'
