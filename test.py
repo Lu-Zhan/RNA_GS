@@ -28,13 +28,16 @@ def main():
         'classes': [
             'Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'Plp1', 'Mbp', 'Aqp4', 'Rgs5', 
             'Agt', 'Chrm3', 'Dclk3', 'Necab1', 'Cspg5', 'Tnr', 'Pdgfrb', 'Anln', 'Gfap',
+            'Ptgds', 'Vtn', 'Kcnc2', 'Acta2', 'Vip', 'Npy', 'Sst', 'Tagln',
         ]
     }
+
+    # used rna: 'Chrm3', 'Snap25', 'Ptgds', 'Vtn', 'Kcnc2', 'Acta2', 'Vip', 'Npy', 'Sst', 'Tagln', 'Plp1'
 
     val_dataset = RNADataset(hparams=gs_system.hparams, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=27)
 
-    trainer = Trainer(enable_model_summary=False)
+    trainer = Trainer(enable_model_summary=False, logger=False)
 
     trainer.predict(model=gs_system, dataloaders=val_dataloader)
 
