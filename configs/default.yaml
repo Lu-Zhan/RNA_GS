@@ -3,7 +3,7 @@ exp_name: last_week
 train:
   lr: 0.005
   iterations: 20000
-  num_primarys: 288000
+  num_primarys: 8000
   num_backups: 0
   tile_size: 16
   densification_start: 1000
@@ -37,10 +37,10 @@ process:
   bg_filter_th: -1
 
 data:
-  data_path: ../data/IM41340_full/IM41340_raw/6/1_36
+  # data_path: ../data/IM41340_full/IM41340_raw/6/1_36
   # data_path: ../data/IM41340_full/IM41340_raw
-  data_path: ../data/IM41340_full/IM41340regi
-  # data_path: ../data/IM41340_full/IM41340regi/2/3_4
+  # data_path: ../data/IM41340_full/IM41340regi
+  data_path: ../data/IM41340_full/IM41340regi/6/1_36
   # data_path: ../data/IM41340_tiled/1_36
   codebook_path: ../data/codebook.xlsx
 

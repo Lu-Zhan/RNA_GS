@@ -3,12 +3,16 @@ import math
 import torch
 import numpy as np
 
+from gsplat.project_gaussians import project_gaussians
+from gsplat.rasterize import rasterize_gaussians
+
 from utils import obtain_init_color, filter_by_background, write_to_csv
 from visualize import view_positions
 from losses import obtain_simi
 
+
 class GaussModel(torch.nn.Module):
-    def __init__(self, num_primarys, num_backups, hw, device):
+    def __init__(self, num_primarys, num_backups, hw, device, B_SIZE=16):
         super(GaussModel, self).__init__()
         self._init_gaussians(num_primarys, num_backups, device)
 
@@ -18,6 +22,48 @@ class GaussModel(torch.nn.Module):
         self.H, self.W = hw[0], hw[1]
         self.focal = 0.5 * float(self.W) / math.tan(0.5 * fov_x)
         self.img_size = torch.tensor([self.W, self.H, 1], device=device)
+        self.B_SIZE = B_SIZE
+    
+    def render(self):
+        means_3d, scales, quats, rgbs, opacities = self.obtain_data()
+
+        # legacy code
+        try:
+            self.B_SIZE += 0
+        except:
+            self.B_SIZE = 16
+
+        xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
+            means_3d,
+            scales,
+            1,
+            quats,
+            self.viewmat,
+            self.viewmat,
+            self.focal,
+            self.focal,
+            self.W / 2,
+            self.H / 2,
+            self.H,
+            self.W,
+            self.B_SIZE,
+        )
+
+        out_img = rasterize_gaussians(
+            xys, 
+            depths,
+            radii,
+            conics,
+            num_tiles_hit,
+            rgbs,
+            opacities,
+            self.H,
+            self.W,
+            self.B_SIZE,
+            self.background,
+        )
+
+        return out_img, conics, radii, xys
     
     @property
     def parameters(self):
