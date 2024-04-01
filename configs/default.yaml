@@ -12,7 +12,7 @@ train:
   model: fix_gauss
   codebook_start: 0
   init_rgb: 1
-  color_bias: 0
+  color_bias: 0.01
 
 loss:
   w_l1: 0
@@ -22,9 +22,9 @@ loss:
   w_masked_l2: 0
   w_bg_l2: 0
   w_mdp_l1: 0
-  w_mdp_masked_l1: 0
-  w_mdp_bg_l1: 0
-  w_mdp_l2: 0
+  w_mdp_masked_l1: 1
+  w_mdp_bg_l1: 1
+  w_mdp_l2: 1
   w_mdp_masked_l2: 0
   w_mdp_bg_l2: 0
 

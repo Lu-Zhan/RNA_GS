@@ -30,6 +30,21 @@ def view_positions(points_xy, bg_image, alpha=1, s=1, prefix=""):
     # alpha = np.max(alpha, axis=-1)
     # alpha = alpha / (alpha.max() + 1e-8)
 
+    if len(alpha) == 0:
+        fig, ax = plt.subplots()
+        ax.imshow(bg_image, cmap="gray")
+        ax.axis("off")
+
+        plt.title(f"{prefix}No points")
+        plt.tight_layout()
+        fig.canvas.draw()
+
+        data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+        plt.close()
+
+        return Image.fromarray(data)
+
     fig, ax = plt.subplots()
     ax.imshow(bg_image, cmap="gray")
     ax.scatter(points_xy[:, 0], points_xy[:, 1], c="r", s=s, alpha=alpha)
