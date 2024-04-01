@@ -1,0 +1,13 @@
+gsplat==0.1.8
+lightning==2.2.1
+matplotlib==3.8.0
+numpy==1.26.4
+opencv_python==4.9.0.80
+pandas==2.2.1
+Pillow==10.2.0
+PyYAML==6.0.1
+PyYAML==6.0.1
+skimage==0.0
+torch==2.2.0
+torchvision==0.17.0
+tyro==0.7.3
