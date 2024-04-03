@@ -3,21 +3,60 @@ import math
 import torch
 import numpy as np
 
+from gsplat.project_gaussians import project_gaussians
+from gsplat.rasterize import rasterize_gaussians
+
 from utils import obtain_init_color, filter_by_background, write_to_csv
 from visualize import view_positions
 from losses import obtain_simi
 
+
 class GaussModel(torch.nn.Module):
-    def __init__(self, num_primarys, num_backups, hw, device):
+    def __init__(self, num_primarys, num_backups, hw, device, B_SIZE=16):
         super(GaussModel, self).__init__()
         self._init_gaussians(num_primarys, num_backups, device)
 
         self._init_mask(num_primarys, num_backups)
 
         fov_x = math.pi / 2.0
+        # fov_x = math.atan(1 / 1001) * 2
         self.H, self.W = hw[0], hw[1]
         self.focal = 0.5 * float(self.W) / math.tan(0.5 * fov_x)
         self.img_size = torch.tensor([self.W, self.H, 1], device=device)
+        self.B_SIZE = B_SIZE
+    
+    def render(self):
+        means_3d, scales, quats, rgbs, opacities = self.obtain_data()
+
+        # legacy code
+        try:
+            self.B_SIZE += 0
+        except:
+            self.B_SIZE = 16
+
+        xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
+            means3d=means_3d,
+            scales=scales,
+            glob_scale=1,
+            quats=quats,
+            viewmat=self.viewmat,
+            projmat=self.viewmat,
+            fx=self.focal, fy=self.focal, cx=self.W / 2, cy=self.H / 2,
+            img_height=self.H, img_width=self.W, block_width=self.B_SIZE,
+        )
+
+        out_img = rasterize_gaussians(
+            xys=xys, 
+            depths=depths,
+            radii=radii,
+            conics=conics,
+            num_tiles_hit=num_tiles_hit,
+            colors=rgbs,
+            opacity=opacities,
+            img_height=self.H, img_width=self.W, block_width=self.B_SIZE, background=self.background,
+        )
+
+        return out_img, conics, radii, xys
     
     @property
     def parameters(self):
@@ -92,7 +131,7 @@ class GaussModel(torch.nn.Module):
             [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 8.0],
+                [0.0, 0.0, 1.0, 1000.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
             device=device,

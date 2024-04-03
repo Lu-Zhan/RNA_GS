@@ -20,7 +20,6 @@ class GSSystem(LightningModule):
     def __init__(self, hparams, **kwargs):  
         super().__init__()
         self.save_hyperparameters(hparams)
-        self.B_SIZE = hparams['train']['tile_size']
 
         # save folder
         self.save_folder = hparams['exp_dir']
@@ -36,6 +35,7 @@ class GSSystem(LightningModule):
             num_backups=self.hparams['train']['num_backups'],
             hw=self.hparams['hw'],
             device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
+            B_SIZE=hparams['train']['tile_size'],
         )
 
         self.rna_class, self.rna_name = read_codebook(path = self.hparams['data']['codebook_path'], bg=False)
@@ -61,7 +61,7 @@ class GSSystem(LightningModule):
 
         if self.is_init_rgb is False and self.hparams['train']['init_rgb']:
             with torch.no_grad():
-                _, _, _, xys = self.forward()
+                _, _, _, xys = self.gs_model.render()
                 self.gs_model.init_rgbs(xys=xys, gt_images=batch)
             self.is_init_rgb = True
 
@@ -75,7 +75,7 @@ class GSSystem(LightningModule):
             if self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
                 self.prune_points()
 
-        output, conics, radii, _ = self.forward()
+        output, conics, radii, _ = self.gs_model.render()
         mdp_output = output.max(dim=-1)[0]
 
         loss = 0.
@@ -175,7 +175,7 @@ class GSSystem(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         batch = batch[0]
-        output, _, _, xys = self.forward()
+        output, _, _, xys = self.gs_model.render()
 
         output = self._original(output)
         batch = self._original(batch)
@@ -252,7 +252,7 @@ class GSSystem(LightningModule):
 
     def predict_step(self, batch, batch_idx):
         batch = batch[0]
-        output, _, _, xys = self.forward()
+        output, _, _, xys = self.gs_model.render()
 
         output = self._original(output)
         batch = self._original(batch)
@@ -353,40 +353,6 @@ class GSSystem(LightningModule):
 
         indices_to_remove = (colors.max(dim=-1)[0] < self.hparams['train']['densification_th']).nonzero(as_tuple=True)[0]
         self.gs_model.maskout(indices_to_remove)
-
-    def forward(self):
-        means_3d, scales, quats, rgbs, opacities = self.gs_model.obtain_data()
-        xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
-            means_3d,
-            scales,
-            1,
-            quats,
-            self.gs_model.viewmat,
-            self.gs_model.viewmat,
-            self.gs_model.focal,
-            self.gs_model.focal,
-            self.gs_model.W / 2,
-            self.gs_model.H / 2,
-            self.gs_model.H,
-            self.gs_model.W,
-            self.B_SIZE,
-        )
-
-        out_img = rasterize_gaussians(
-            xys, 
-            depths,
-            radii,
-            conics,
-            num_tiles_hit,
-            rgbs,
-            opacities,
-            self.gs_model.H,
-            self.gs_model.W,
-            self.B_SIZE,
-            self.gs_model.background,
-        )
-
-        return out_img, conics, radii, xys
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint['gs_model'] = self.gs_model
