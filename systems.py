@@ -10,9 +10,10 @@ from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
 from losses import *
-from visualize import view_recon
+from visualize import view_recon, view_rna_refscore
 from utils import read_codebook
 from models import model_zoo
+import matplotlib.pyplot as plt
 
 
 class GSSystem(LightningModule):
@@ -278,7 +279,15 @@ class GSSystem(LightningModule):
             rna_name=self.rna_name,
             selected_classes=self.hparams['view']['classes'],
         )
-
+        
+        max_color_post = self.gs_model.post_colors(xys, batch, th=self.hparams['process']['bg_filter_th'])
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+        cos_score, _, pred_class_name = self.gs_model.obtain_calibration(self.rna_class, self.rna_name)
+        ref_score = cos_score * max_color_post
+        selected_classes=self.hparams['view']['classes']
+        view_rna_refscore(selected_classes,pred_class_name,ref_score,self.rna_class,self.rna_name,self.save_folder)
+        
         view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
         view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
         view_on_image_cos.save(os.path.join(self.save_folder, f"positions_mdp_cos.png"))
@@ -347,7 +356,6 @@ class GSSystem(LightningModule):
 
     def forward(self):
         means_3d, scales, quats, rgbs, opacities = self.gs_model.obtain_data()
-
         xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
             means_3d,
             scales,

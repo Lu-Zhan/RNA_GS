@@ -11,3 +11,7 @@ lightning_logs/
 test/
 archive/
 .vscode/
+sbatch/
+data.tar.gz
+*.sh
+requirements.txt
