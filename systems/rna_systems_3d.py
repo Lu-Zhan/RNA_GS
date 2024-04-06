@@ -22,9 +22,9 @@ class GSSystem3D(LightningModule):
         # save folder
         self.save_folder = hparams['exp_dir']
         os.makedirs(self.save_folder, exist_ok=True)
-        os.makedirs(os.path.join(self.save_folder, "epoch"), exist_ok=True)
+        os.makedirs(os.path.join(self.save_folder, "recon"), exist_ok=True)
+        os.makedirs(os.path.join(self.save_folder, "recon_plane"), exist_ok=True)
 
-        self.frames = []
         self.mdp_image = None
         self.is_init_rgb = False
 
@@ -198,26 +198,24 @@ class GSSystem3D(LightningModule):
         mean_mse = torch.mean((output - batch) ** 2).cpu()
         mean_psnr = float(10 * torch.log10(1 / mean_mse))
 
-        output = output.max(dim=0)[0]
-        batch = batch.max(dim=0)[0]
+        mdp_output = output.max(dim=0)[0]
+        mdp_batch = batch.max(dim=0)[0]
 
-        mdp_psnr = calculate_mdp_psnr(output, batch)
+        mdp_psnr = calculate_mdp_psnr(mdp_output, mdp_batch)
         self.log_step('val/mean_psnr', mean_psnr, on_step=False, on_epoch=True, prog_bar=True)
         self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
-        # visualization
-        recon_image = view_recon(pred=output, gt=batch)
-        recon_image = Image.fromarray(recon_image)
-        self.frames.append(recon_image)
-        recon_image.save(os.path.join(self.save_folder, "epoch", f"epoch_{self.global_step:05d}.png"))
-
         if self.global_step % 5000 == 0:
-            self.logger.experiment.log({"val_image": [wandb.Image(recon_image, caption="val_image")]}, step=self.global_step)
+            # visualization
+            recon_images = view_recon(pred=mdp_output, gt=mdp_batch)
+            recon_images = Image.fromarray(recon_images)
+            recon_images.save(os.path.join(self.save_folder, "recon", f"epoch_{self.global_step:05d}.png"))
+            self.logger.experiment.log({"val_image": [wandb.Image(recon_images, caption="val_image")]}, step=self.global_step)
         
         if self.global_step % 10000 == 0:
             view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes = self.gs_model.visualize_points(
                 xys=xys, 
-                batch=batch,
+                batch=mdp_batch,
                 mdp_dapi_image=self.mdp_dapi_image,
                 post_th=self.hparams['process']['bg_filter_th'],
                 rna_class=self.rna_class, 
@@ -233,7 +231,13 @@ class GSSystem3D(LightningModule):
             os.makedirs(os.path.join(self.save_folder, 'classes'), exist_ok=True)
             for i, view_class in enumerate(view_classes):
                 view_class.save(os.path.join(self.save_folder, 'classes', f"positions_class_{self.hparams['view']['classes'][i]}.png"))
-            
+
+            # visualization
+            recon_images = [Image.fromarray(view_recon(pred=x, gt=y)) for x, y in zip(output, batch)]
+
+            for i, image in enumerate(recon_images):
+                image.save(os.path.join(self.save_folder, "recon_plane", f"epoch_{self.global_step:05d}_{i}.png"))
+
             self.logger.experiment.log({
                 "positions": [
                     wandb.Image(view_on_image, caption="mdp"),
@@ -244,10 +248,9 @@ class GSSystem3D(LightningModule):
                 "positions_classes": [
                     wandb.Image(x, caption=f"pos_{self.hparams['view']['classes'][i]}") for i, x in enumerate(view_classes)
                 ],
-            })
-
-            self.logger.experiment.log({
-                
+                "recon_plane": [
+                    wandb.Image(x, caption=f"plane_{i}") for i, x in enumerate(recon_images)
+                ],
             })
 
             if self.global_step > 0:
@@ -260,11 +263,6 @@ class GSSystem3D(LightningModule):
                     post_th=self.hparams['process']['bg_filter_th'],
                     path=os.path.join(self.save_folder, "results.csv"),
                 )
-
-        if self.hparams['model']['save_gif'] == 1 and self.global_step == self.hparams['train']['iterations']:
-            frames = [Image.fromarray(x) for x in self.frames]
-            save_path = os.path.join(self.save_folder, "training.gif")
-            frames[0].save(save_path, save_all=True, append_images=frames[1:], optimize=False, duration=5, loop=0)
 
         return mean_psnr
 
