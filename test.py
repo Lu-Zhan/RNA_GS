@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from lightning.pytorch import Trainer, seed_everything
 from torch.utils.data import DataLoader
 
-from systems import GSSystem
+from systems import GSSystem3D
 from train import RNADataset
 
 torch.set_float32_matmul_precision('medium')
@@ -23,7 +23,7 @@ def main():
     seed_everything(42)
 
     # model & dataloader
-    gs_system = GSSystem.load_from_checkpoint(args.checkpoint_path)
+    gs_system = GSSystem3D.load_from_checkpoint(args.checkpoint_path)
     gs_system.hparams['view'] = {
         'classes': [
             'Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'Plp1', 'Mbp', 'Aqp4', 'Rgs5', 

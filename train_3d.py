@@ -12,7 +12,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
 from systems import GSSystem3D
-from datasets import RNADataset
+from datasets import RNADataset3D
 
 torch.set_float32_matmul_precision('medium')
 
@@ -20,9 +20,9 @@ torch.set_float32_matmul_precision('medium')
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])
-    parser.add_argument("--config", type=str, default='configs/default.yaml')
+    parser.add_argument("--config", type=str, default='configs/default_3d.yaml')
     parser.add_argument("--exp_name", type=str, default='')
-    parser.add_argument("--exp_dir", type=str, default='outputs/')
+    parser.add_argument("--exp_dir", type=str, default='outputs_3d/')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
     
@@ -55,10 +55,10 @@ def main():
     )
 
     # model & dataloader
-    train_dataset = RNADataset(hparams=config, mode='train')
+    train_dataset = RNADataset3D(hparams=config, mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=8)
 
-    val_dataset = RNADataset(hparams=config, mode='val')
+    val_dataset = RNADataset3D(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 
     config['hw'] = train_dataset.size[:2]

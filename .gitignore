@@ -1,5 +1,5 @@
 exps/
-outputs/
+outputs*/
 wandb/
 *.pyc
 data/

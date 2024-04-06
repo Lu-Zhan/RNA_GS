@@ -9,13 +9,14 @@ from lightning import LightningModule
 from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
-from losses import *
-from visualize import view_recon
-from utils import read_codebook
-from models import model_zoo
+from systems.losses import *
+from utils.visualize import view_recon
+from utils.utils import read_codebook
+from systems.models import model_zoo
+from systems.cameras import SliceCamera
 
 
-class GSSystem(LightningModule):
+class GSSystem3D(LightningModule):
     def __init__(self, hparams, **kwargs):  
         super().__init__()
         self.save_hyperparameters(hparams)
@@ -37,6 +38,14 @@ class GSSystem(LightningModule):
             B_SIZE=hparams['train']['tile_size'],
         )
 
+        self.cam_model = SliceCamera(
+            num_slice=self.hparams['model']['num_slice'],
+            step_z=self.hparams['model']['step_z'],
+            camera_z=self.hparams['model']['camera_z'],
+            refine_camera=self.hparams['train']['refine_camera'],
+            device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
+        )
+
         self.rna_class, self.rna_name = read_codebook(path = self.hparams['data']['codebook_path'], bg=False)
         self.rna_class = torch.tensor(self.rna_class, device=self.gs_model.means_3d.device)
 
@@ -56,11 +65,9 @@ class GSSystem(LightningModule):
         return optimizer
 
     def training_step(self, batch, batch_idx):
-        batch = batch[0]
-
         if self.is_init_rgb is False and self.hparams['train']['init_rgb']:
             with torch.no_grad():
-                _, _, _, xys = self.gs_model.render()
+                _, _, _, xys = self.gs_model.render(camera=self.cam_model)
                 self.gs_model.init_rgbs(xys=xys, gt_images=batch)
             self.is_init_rgb = True
 
@@ -74,8 +81,10 @@ class GSSystem(LightningModule):
             if self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
                 self.prune_points()
 
-        output, conics, radii, _ = self.gs_model.render()
-        mdp_output = output.max(dim=-1)[0]
+        output, conics, radii, _ = self.gs_model.render(camera=self.cam_model)
+
+        # output = mdp_slices.max(dim=0)[0]   # (k, h, w, 15) -> (h, w, 15)
+        mdp_output = output.max(dim=-1)[0]   # (h, w, 15) -> (h, w)
 
         loss = 0.
 

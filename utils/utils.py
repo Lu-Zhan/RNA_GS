@@ -35,7 +35,7 @@ def read_codebook(path, bg=False):
 def obtain_init_color(input_xys, hw, image):
     # input_xys: [N, 2]
     # hw: [H, W]
-    # image: [H, W, 15]
+    # image: [H, W, c]
 
     input_coords = input_xys / torch.tensor(hw, dtype=input_xys.dtype, device=input_xys.device).reshape(1, 2)
     input_coords = (input_coords - 0.5) * 2

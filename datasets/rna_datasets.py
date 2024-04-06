@@ -55,24 +55,6 @@ def images_to_tensor(image_path: Path):
     return imgs_tensor ** 0.5, (min_value, max_value)
 
 
-# def images_to_tensor_cropped(image_path: Path):
-#     image_paths = [image_path / f'{i}.png' for i in range(1, 16)]
-
-#     images = []
-
-#     for image_path in image_paths:
-#         img = Image.open(image_path)
-#         transform = transforms.ToTensor()
-#         img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
-#         images.append(img_tensor)
-
-#     imgs_tensor = torch.cat(images, dim=2) / 255. # [h, w, 15]
-#     min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
-#     imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
-
-#     return imgs_tensor, (min_value, max_value)
-
-
 def read_dapi_image(image_path: Path):
     image_paths = [image_path / f'F1R{r}Ch1.png' for r in range(1, 6)]
 

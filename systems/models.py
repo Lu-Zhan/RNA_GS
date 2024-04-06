@@ -6,26 +6,24 @@ import numpy as np
 from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
-from utils import obtain_init_color, filter_by_background, write_to_csv
-from visualize import view_positions
-from losses import obtain_simi
+from utils.utils import obtain_init_color, filter_by_background, write_to_csv
+from utils.visualize import view_positions
+from systems.losses import obtain_simi
 
 
 class GaussModel(torch.nn.Module):
-    def __init__(self, num_primarys, num_backups, hw, device, B_SIZE=16):
+    def __init__(self, num_primarys, num_backups, device, camera, B_SIZE=16):
         super(GaussModel, self).__init__()
+        self.camera = camera
         self._init_gaussians(num_primarys, num_backups, device)
-
         self._init_mask(num_primarys, num_backups)
 
-        fov_x = math.pi / 2.0
-        # fov_x = math.atan(1 / 1001) * 2
-        self.H, self.W = hw[0], hw[1]
-        self.focal = 0.5 * float(self.W) / math.tan(0.5 * fov_x)
-        self.img_size = torch.tensor([self.W, self.H, 1], device=device)
         self.B_SIZE = B_SIZE
     
-    def render(self):
+    def render(self, camera=None):
+        if camera is None:
+            camera = self.camera
+
         means_3d, scales, quats, rgbs, opacities = self.obtain_data()
 
         # legacy code
@@ -39,10 +37,10 @@ class GaussModel(torch.nn.Module):
             scales=scales,
             glob_scale=1,
             quats=quats,
-            viewmat=self.viewmat,
-            projmat=self.viewmat,
-            fx=self.focal, fy=self.focal, cx=self.W / 2, cy=self.H / 2,
-            img_height=self.H, img_width=self.W, block_width=self.B_SIZE,
+            viewmat=camera.viewmat,
+            projmat=camera.viewmat,
+            fx=camera.focal, fy=camera.focal, cx=camera.W / 2, cy=camera.H / 2,
+            img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
         )
 
         out_img = rasterize_gaussians(
@@ -53,10 +51,60 @@ class GaussModel(torch.nn.Module):
             num_tiles_hit=num_tiles_hit,
             colors=rgbs,
             opacity=opacities,
-            img_height=self.H, img_width=self.W, block_width=self.B_SIZE, background=self.background,
+            img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE, background=self.background,
         )
 
         return out_img, conics, radii, xys
+    
+    def render_slices(self, camera=None):
+        if camera is None:
+            camera = self.camera
+
+        means_3d, scales, quats, rgbs, opacities = self.obtain_data()
+
+        xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
+            means3d=means_3d,
+            scales=scales,
+            glob_scale=1,
+            quats=quats,
+            viewmat=camera.viewmat,
+            projmat=camera.viewmat,
+            fx=camera.focal, fy=camera.focal, cx=camera.W / 2, cy=camera.H / 2,
+            img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
+        )
+
+        c33 = 1 / cov3d[..., -2:-1]
+        camera_z = - camera.camera_z
+        z_planes = camera.z_planes
+
+        # means_3d (n, 3), z_plane (k)
+
+        # (1, k) - (n, 1) = (n, k), (n, 1) - (n, k) = (n, k)
+        term = torch.exp(-0.5 * c33 * (z_planes[None, :] - means_3d[:, -2:-1]) ** 2)
+
+        # (n, 1) / (1, k) = (n, k) * (n, k) = (n, k)
+        rescale_radii = (means_3d[..., -2:-1] - camera_z) /  (z_planes[None, :] - camera_z) * term
+
+        # (n, 1, c) / (n, k, 1) = (n, k, c)
+        new_conics = conics[:, None, :] / rescale_radii[..., None] ** 2
+
+        out_imgs = []
+        for k in range(new_conics.shape[1]):
+            out_img = rasterize_gaussians(
+                xys=xys, 
+                depths=depths,
+                radii=radii,
+                conics=new_conics[:, k],
+                num_tiles_hit=num_tiles_hit,
+                colors=rgbs,
+                opacity=opacities,
+                img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE, background=self.background,
+            )
+
+            out_imgs.append(out_img)
+        
+        out_imgs = torch.stack(out_imgs, dim=0) # (k, h, w, 15)
+        return out_imgs, new_conics, radii, xys
     
     @property
     def parameters(self):
@@ -127,26 +175,26 @@ class GaussModel(torch.nn.Module):
         )
         self.opacities = torch.ones((num_points, 1), device=device)
 
-        self.viewmat = torch.tensor(
-            [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 1000.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            device=device,
-        )
+        # self.viewmat = torch.tensor(
+        #     [
+        #         [1.0, 0.0, 0.0, 0.0],
+        #         [0.0, 1.0, 0.0, 0.0],
+        #         [0.0, 0.0, 1.0, 8.0],
+        #         [0.0, 0.0, 0.0, 1.0],
+        #     ],
+        #     device=device,
+        # )
         
-        self.background = torch.zeros(15, device=device)
+        self.background = torch.zeros(self.camera.num_dims, device=device)
 
         self.means_3d.requires_grad = True
         self.scales.requires_grad = True
         self.quats.requires_grad = True
         self.opacities.requires_grad = True
-        self.viewmat.requires_grad = False
+        # self.viewmat.requires_grad = False
 
         # self.rgbs = torch.rand(num_points, 15, device=device)
-        self.rgbs = torch.randn(num_points, 15, device=device) / 0.4
+        self.rgbs = torch.randn(num_points, self.camera.num_dims, device=device) / 0.4
         self.rgbs.requires_grad = True
 
     def _init_mask(self, num_primarys, num_backups):
@@ -160,7 +208,7 @@ class GaussModel(torch.nn.Module):
         # color range (color_bias, 1 - color_bias)
         color = obtain_init_color(
             input_xys=xys,
-            hw=[self.H, self.W],
+            hw=[self.camera.H, self.camera.W],
             image=gt_images,
         )
 
@@ -171,7 +219,7 @@ class GaussModel(torch.nn.Module):
         processed_colors = filter_by_background(
             xys=xys,
             colors=self.colors,
-            hw=[self.H, self.W],
+            hw=[self.camera.H, self.camera.W],
             image=gt_images,
             th=th,
         )
@@ -326,6 +374,7 @@ class GaussModel(torch.nn.Module):
             view_classes.append(view_specific)
 
         return view_classes, selected_classes
+
 
 class FixGaussModel(GaussModel):
     def obtain_data(self):

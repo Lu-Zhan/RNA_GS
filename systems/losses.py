@@ -88,11 +88,11 @@ def radius_loss(radii, range=[2, 4]):
 
 
 def calculate_mdp_psnr(img, gt_img):
-    MDP_img = img.max(axis = 2).values
-    MDP_gt_img = gt_img.max(axis = 2).values
+    MDP_img = img.max(axis=2).values
+    MDP_gt_img = gt_img.max(axis=2).values
     mse_loss = torch.nn.MSELoss()
     mse = mse_loss(MDP_img, MDP_gt_img)
-    mdp_psnr =  float(10 * torch.log10(1 / mse))
+    mdp_psnr = float(10 * torch.log10(1 / mse))
     return mdp_psnr
 
 

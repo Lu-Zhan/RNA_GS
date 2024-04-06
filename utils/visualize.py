@@ -78,7 +78,11 @@ def view_recon(pred, gt, resize=(192, 192)):
     pred = pred.detach().cpu().numpy()
     gt = gt.detach().cpu().numpy()
 
-    fig, axs = plt.subplots(6, 5, figsize=(15, 15))
+    n_rows = gt.shape[-1] * 2
+    n_cols = np.ceil(gt.shape[-1] / 3).astype(np.uint8)
+
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 15))
+    axs = axs.reshape([n_rows, n_cols])
     # plt.subplots_adjust(top=1, bottom=0, left=0, right=1, wspace=0, hspace=0)
     # plt.margins(0, 0)
 
@@ -86,17 +90,17 @@ def view_recon(pred, gt, resize=(192, 192)):
     vmax = gt.ravel().max()
     # vmax = max(pred.max(), gt.max())
 
-    for i in range(3):
-        for j in range(5):
+    for i in range(n_rows // 2):
+        for j in range(n_cols):
             # pred
-            axs[i * 2 + 1, j].imshow(pred[..., i * 5 + j], cmap="jet", interpolation="nearest", vmin=vmin, vmax=vmax) 
+            axs[i * 2 + 1, j].imshow(pred[..., i * n_cols + j], cmap="jet", interpolation="nearest", vmin=vmin, vmax=vmax) 
             axs[i * 2 + 1, j].axis("off")
-            axs[i * 2 + 1, j].set_title(f"Pred {i * 5 + j}")
+            axs[i * 2 + 1, j].set_title(f"Pred {i * n_cols + j}")
 
             # gt
-            axs[i * 2, j].imshow(gt[..., i * 5 + j], cmap="jet", interpolation="nearest", vmin=vmin, vmax=vmax) 
+            axs[i * 2, j].imshow(gt[..., i * n_cols + j], cmap="jet", interpolation="nearest", vmin=vmin, vmax=vmax) 
             axs[i * 2, j].axis("off")
-            axs[i * 2, j].set_title(f"GT {i * 5 + j}")
+            axs[i * 2, j].set_title(f"GT {i * n_cols + j}")
 
     plt.tight_layout()
     plt.subplots_adjust(
