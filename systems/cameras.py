@@ -24,7 +24,7 @@ class SliceCamera(nn.Module):
         self.device = device
         self.num_dims = num_dims
 
-        self.viewmat = torch.tensor(
+        self.base_viewmat = torch.tensor(
             [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
@@ -38,8 +38,13 @@ class SliceCamera(nn.Module):
         if refine_camera:
             self.camera_z.requires_grad = True
 
-        self.slice_zs = (torch.linspace(0, num_slice, num_slice, device=device) + 0.5) / num_slice * step_z
-
+        self.base_plane_zs = (torch.arange(num_slice, device=device) + 0.5) * step_z - num_slice / 2 * step_z - camera_z
+    
     @property
-    def z_planes(self):
-        return self.slice_zs + self.camera_z
+    def viewmat(self):
+        self.base_viewmat[2, -1] = -self.camera_z
+        return self.base_viewmat
+    
+    @property
+    def plane_zs(self):
+        return self.base_plane_zs + self.camera_z

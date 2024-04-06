@@ -73,20 +73,20 @@ class GaussModel(torch.nn.Module):
             img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
         )
 
-        c33 = 1 / cov3d[..., -2:-1]
-        camera_z = - camera.camera_z
-        z_planes = camera.z_planes
+        c33 = 1 / cov3d[..., -1:]
+        camera_z = camera.camera_z
+        plane_zs = camera.plane_zs
 
         # means_3d (n, 3), z_plane (k)
 
         # (1, k) - (n, 1) = (n, k), (n, 1) - (n, k) = (n, k)
-        term = torch.exp(-0.5 * c33 * (z_planes[None, :] - means_3d[:, -2:-1]) ** 2)
+        term = torch.exp(-0.5 * c33 * (plane_zs[None, :] - means_3d[:, -1:]) ** 2)
 
         # (n, 1) / (1, k) = (n, k) * (n, k) = (n, k)
-        rescale_radii = (means_3d[..., -2:-1] - camera_z) /  (z_planes[None, :] - camera_z) * term
+        rescale_radii = (means_3d[..., -1:] - camera_z) /  (plane_zs[None, :] - camera_z) * term
 
-        # (n, 1, c) / (n, k, 1) = (n, k, c)
-        new_conics = conics[:, None, :] / rescale_radii[..., None] ** 2
+        # (n, 1, c) / (n, k, 1) = (n, k, c), add 1e-8 to avoid zero division
+        new_conics = conics[:, None, :] / (rescale_radii[..., None] ** 2 + 1e-8)
 
         out_imgs = []
         for k in range(new_conics.shape[1]):
