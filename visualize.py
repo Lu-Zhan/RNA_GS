@@ -76,7 +76,7 @@ def view_recon(pred, gt, resize=(192, 192)):
 
     pred = pred[0].permute(1, 2, 0)
     gt = gt[0].permute(1, 2, 0)
-    
+
     pred = pred.detach().cpu().numpy()
     gt = gt.detach().cpu().numpy()
 
@@ -114,23 +114,31 @@ def view_recon(pred, gt, resize=(192, 192)):
     return data
 
 
-def view_rna_refscore(selected_classes,pred_class_name,ref_score,rna_class,rna_name,save_folder):
-    os.makedirs(os.path.join(save_folder, 'rna_refscore'), exist_ok=True)
+def view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder):
+    os.makedirs(os.path.join(save_folder, "classes_dist"), exist_ok=True)
+
     for selected_class in selected_classes:
         selected_index = np.where(pred_class_name == selected_class)[0]
-        cnt_selected_index=len(selected_index)
+        cnt_selected_index = len(selected_index)
         selected_ref_score = ref_score[selected_index]
-        ref_score_np = ref_score.cpu().numpy()
+        ref_score_np = ref_score.data.cpu().numpy()
         hm_weight = int(rna_class[np.where(rna_name == selected_class)[0]].sum())
-        cnt_selected_index_90 = len(np.where((pred_class_name == selected_class) & (ref_score_np > 0.9))[0])
-        cnt_selected_index_50 = len(np.where((pred_class_name == selected_class) & (ref_score_np > 0.5))[0])
-        bins = [i / 10.0 for i in range(11)]
+
+        cnt_selected_index_50 = len(
+            np.where((pred_class_name == selected_class) & (ref_score_np > 0.5))[0]
+        )
+
+        # bins = [i / 10.0 for i in range(11)]
         plt.figure()
-        plt.hist(selected_ref_score.cpu(), bins=bins, color='blue', edgecolor='black')
-        plt.title(f"{selected_class}: hm_weight: {hm_weight}, num: {cnt_selected_index}, num0.9: {cnt_selected_index_90}, num0.5: {cnt_selected_index_50}")
-        plt.xlabel('Ref Score')
-        plt.ylabel('Frequency')
+        plt.hist(selected_ref_score.cpu(), bins=30, color="blue", edgecolor="black")
+
+        plt.title(
+            f"{selected_class}-{hm_weight}, num: {cnt_selected_index}, num0.5: {cnt_selected_index_50}"
+        )
+        plt.xlabel("Ref Score")
+        plt.ylabel("Number")
+
         # 显示网格
         plt.grid(True)
-        plt.savefig(os.path.join(save_folder, 'rna_refscore', f"{selected_class}_hist.png"))
+        plt.savefig(os.path.join(save_folder, "classes_dist", f"{selected_class}_hist.png"))
         plt.show()

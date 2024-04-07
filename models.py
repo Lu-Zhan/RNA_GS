@@ -7,7 +7,7 @@ from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
 from utils import obtain_init_color, filter_by_background, write_to_csv
-from visualize import view_positions
+from visualize import view_positions, view_score_dist
 from losses import obtain_simi
 
 
@@ -326,6 +326,21 @@ class GaussModel(torch.nn.Module):
             view_classes.append(view_specific)
 
         return view_classes, selected_classes
+
+    def visualize_score_dist(
+            self, xys, batch, post_th, rna_class, rna_name, save_folder,
+            selected_classes=['Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'Plp1', 'Mbp', 'Aqp4', 'Rgs5']
+        ):
+        max_color_post = self.post_colors(xys, batch, th=post_th)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+
+        cos_score, _, pred_class_name = self.obtain_calibration(rna_class, rna_name)
+
+        ref_score = cos_score * max_color_post
+
+        # selected_classes=self.hparams['view']['classes']
+        view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder)
 
 class FixGaussModel(GaussModel):
     def obtain_data(self):
