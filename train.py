@@ -38,7 +38,6 @@ def main():
         project='rna_cali_0320',
         save_dir=config['exp_dir'],
     )
-
     ckpt_path = os.path.join(logger.save_dir, logger.experiment.id, 'checkpoints')
     os.makedirs(ckpt_path, exist_ok=True)
     config['exp_dir'] = os.path.dirname(ckpt_path)

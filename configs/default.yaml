@@ -1,4 +1,4 @@
-exp_name: last_week
+exp_name: test_dist
 
 train:
   lr: 0.005
@@ -38,11 +38,8 @@ process:
   bg_filter_th: -1
 
 data:
-  # data_path: ../data/IM41340_full/IM41340_raw/6/1_36
-  # data_path: ../data/IM41340_full/IM41340_raw
-  # data_path: ../data/IM41340_full/IM41340regi
+
   data_path: ../data/IM41340_full/IM41340regi/6/1_36
-  # data_path: ../data/IM41340_tiled/1_36
   codebook_path: ../data/codebook.xlsx
 
 model:

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from PIL import Image
 from torch.nn.functional import interpolate
-
+import os
 
 def view_positions(points_xy, bg_image, alpha=1, s=1, prefix=""):
     if len(points_xy) == 0:
@@ -27,6 +27,8 @@ def view_positions(points_xy, bg_image, alpha=1, s=1, prefix=""):
     points_xy = points_xy[mask]
 
     alpha = alpha[mask]
+    # cyy: sometimes it appears that alpha>1 which causes error
+    alpha=np.clip(alpha, 0, 1)
     # alpha = np.max(alpha, axis=-1)
     # alpha = alpha / (alpha.max() + 1e-8)
 
@@ -74,7 +76,7 @@ def view_recon(pred, gt, resize=(192, 192)):
 
     pred = pred[0].permute(1, 2, 0)
     gt = gt[0].permute(1, 2, 0)
-    
+
     pred = pred.detach().cpu().numpy()
     gt = gt.detach().cpu().numpy()
 
@@ -114,3 +116,33 @@ def view_recon(pred, gt, resize=(192, 192)):
     plt.close()
 
     return data
+
+
+def view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder):
+    os.makedirs(os.path.join(save_folder, "classes_dist"), exist_ok=True)
+
+    for selected_class in selected_classes:
+        selected_index = np.where(pred_class_name == selected_class)[0]
+        cnt_selected_index = len(selected_index)
+        selected_ref_score = ref_score[selected_index]
+        ref_score_np = ref_score.data.cpu().numpy()
+        hm_weight = int(rna_class[np.where(rna_name == selected_class)[0]].sum())
+
+        cnt_selected_index_50 = len(
+            np.where((pred_class_name == selected_class) & (ref_score_np > 0.5))[0]
+        )
+
+        # bins = [i / 10.0 for i in range(11)]
+        plt.figure()
+        plt.hist(selected_ref_score.cpu(), bins=30, color="blue", edgecolor="black")
+
+        plt.title(
+            f"{selected_class}-{hm_weight}, num: {cnt_selected_index}, num0.5: {cnt_selected_index_50}"
+        )
+        plt.xlabel("Ref Score")
+        plt.ylabel("Number")
+
+        # 显示网格
+        plt.grid(True)
+        plt.savefig(os.path.join(save_folder, "classes_dist", f"{selected_class}_hist.png"))
+        plt.show()

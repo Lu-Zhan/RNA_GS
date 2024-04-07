@@ -287,6 +287,16 @@ class GSSystem3D(LightningModule):
             rna_name=self.rna_name,
             selected_classes=self.hparams['view']['classes'],
         )
+        
+        self.gs_model.visualize_score_dist(
+            xys=xys, 
+            batch=batch,
+            post_th=self.hparams['process']['bg_filter_th'],
+            rna_class=self.rna_class, 
+            rna_name=self.rna_name,
+            save_folder=self.save_folder,
+            selected_classes=self.hparams['view']['classes'],
+        )
 
         view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
         view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
