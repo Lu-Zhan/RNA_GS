@@ -79,7 +79,7 @@ class GSSystem3D(LightningModule):
             self.is_init_rgb = True
 
         if self.mdp_image is None:
-            self.mdp_image = batch.max(dim=-1)[0].max(dim=0)[0]
+            self.mdp_image = batch.max(dim=-1)[0]   #.max(dim=0)[0]
 
         den_interval = self.hparams['train']['densification_interval']
         den_start = self.hparams['train']['densification_start']
@@ -91,7 +91,7 @@ class GSSystem3D(LightningModule):
         output, conics, radii, _ = self.gs_model.render_slices(camera=self.cam_model)
 
         # output = mdp_slices.max(dim=0)[0]   # (n, h, w, k) -> (h, w, k)
-        mdp_output = output.max(dim=-1)[0].max(dim=0)[0]   # (n, h, w, k) -> (h, w)
+        mdp_output = output.max(dim=-1)[0]  #.max(dim=0)[0]   # (n, h, w, k) -> (h, w)
 
         loss = 0.
 
@@ -261,7 +261,7 @@ class GSSystem3D(LightningModule):
                 self.gs_model.save_to_csv(
                     xys=xys,
                     batch=mdp_batch,
-                    rna_class=self.rna_class, 
+                    rna_class=self.rna_class,
                     rna_name=self.rna_name,
                     hw=self.hparams['hw'],
                     post_th=self.hparams['process']['bg_filter_th'],
@@ -289,6 +289,17 @@ class GSSystem3D(LightningModule):
                 os.makedirs(os.path.join(self.save_folder, 'classes_top10'), exist_ok=True)
                 for i, selected_class in enumerate(top_classes):
                     selected_class.save(os.path.join(self.save_folder, 'classes_top10', f"positions_{i}_{selected_classes[i]}.png"))
+                
+                # show score distribution
+                self.gs_model.visualize_score_dist(
+                    xys=xys, 
+                    batch=mdp_batch,
+                    post_th=self.hparams['process']['bg_filter_th'],
+                    rna_class=self.rna_class, 
+                    rna_name=self.rna_name,
+                    save_folder=self.save_folder,
+                    selected_classes=self.hparams['view']['classes'],
+                )
                 
         return mean_psnr
 

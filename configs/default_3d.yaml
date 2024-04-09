@@ -3,7 +3,7 @@ exp_name: debug_3d
 train:
   lr: 0.005
   iterations: 20000
-  num_primarys: 222
+  num_primarys: 500
   num_backups: 0
   tile_size: 16
   densification_start: 1000
