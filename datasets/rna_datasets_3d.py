@@ -63,22 +63,40 @@ def read_images(image_path: Path):
         images[key] = torch.cat(images[key], dim=0) # (n, h, w, 1)
     
     imgs_tensor = torch.cat([images[f'C{i+1:04d}'] for i in range(4)], dim=-1) / 1.0 # (n, h, w, 4)
+    # imgs_tensor[imgs_tensor < 10] = 0
     imgs_tensor = torch.log10(imgs_tensor + 1)
 
-    # return imgs_tensor, (0, 1)
+    dapi_tensor = imgs_tensor[..., :1]
+    imgs_tensor = imgs_tensor[..., 1:]  # (n, h, w, k)
 
-    min_value = imgs_tensor.min()
-    max_value = imgs_tensor.mean() + 3 * imgs_tensor.std()
-    imgs_tensor = (torch.clamp(imgs_tensor, max=max_value) - min_value) / (max_value - min_value)
+    all_pixels = imgs_tensor.reshape(-1, imgs_tensor.shape[-1]) # (m, k)
+    top_min_values = torch.topk(-all_pixels, int(0.01 * all_pixels.shape[0]), dim=0)[0] # (0.01 * m, k)
+    min_values = - top_min_values.min(dim=0)[0].mean(dim=0)
 
-    return imgs_tensor ** 0.5, (min_value, max_value)
+    # min_values = imgs_tensor.min()
+    max_values = imgs_tensor.max()
+
+    imgs_tensor = torch.relu(imgs_tensor - min_values) / (max_values - min_values)
+    dapi_tensor = torch.relu(dapi_tensor - min_values) / (max_values - min_values)
+
+    return torch.cat((dapi_tensor, imgs_tensor), dim=-1), (min_values, max_values)
+
+    # min_value = imgs_tensor.min()
+
+    # # min_value = 0.01
+    # max_value = imgs_tensor.mean() + 3 * imgs_tensor.std()
+    # # max_value = imgs_tensor.max()
+
+    # imgs_tensor = (torch.relu(torch.clamp(imgs_tensor, max=max_value) - min_value)) / (max_value - min_value)
+
+    # return imgs_tensor ** 0.5, (min_value, max_value)
     
 
 # draw histogram of the image, image: [h, w]
 def draw_histogram(image, name):
     # remove zero values, 100 bins, title is the percentage of the non-zero values
-    pos_image = image[image > 0]
-    plt.hist(image.ravel(), 100)
+    pos_image = image[image < 1.9]
+    plt.hist(pos_image.ravel(), 100, [1.6, 1.95])
     plt.title(f'P: {(pos_image.ravel().shape[0] / image.ravel().shape[0]) * 100:.2f}% mean: {pos_image.mean():.2f} std: {pos_image.std():.2f}' + \
               f' O: mean: {image.mean():.2f} std: {image.std():.2f}')
 
@@ -86,7 +104,7 @@ def draw_histogram(image, name):
 
 
 if __name__ == "__main__":
-    images, _ = read_images('/home/luzhan/Projects/rna/data/IM41236/rawtiff/')
+    images, _ = read_images('/home/luzhan/Projects/rna/data/rna_data_0407/IM41236/rawtiff')
     draw_histogram(images[..., 1:].numpy(), name=f'histogram.png')
 
     # val_dataset = RNA3DDataset(

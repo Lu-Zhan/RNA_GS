@@ -16,7 +16,6 @@ from datasets import RNADataset3D
 
 torch.set_float32_matmul_precision('medium')
 
-
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])

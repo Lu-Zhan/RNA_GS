@@ -113,7 +113,7 @@ class GaussModel(torch.nn.Module):
         return (
             self.means_3d,
             self.scales,
-            self.quats,
+            # self.quats,
             self.rgbs,
             self.opacities,
         )
@@ -159,25 +159,31 @@ class GaussModel(torch.nn.Module):
     def _init_gaussians(self, num_primarys, num_backups, device):
         num_points = num_primarys + num_backups
 
-        # self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # change to x y
+        self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # change to x y
 
-        self.means_3d = torch.zeros(num_points, 3, device=device)
+        # self.means_3d = torch.zeros(num_points, 3, device=device)
 
         self.scales = torch.rand(num_points, 3, device=device) * 0.5
+        # self.scales = torch.ones(num_points, 3, device=device) * 2
+        # self.scales[:, -2] = self.scales[:, -2] / 3
 
-        u = torch.rand(num_points, 1, device=device)
-        v = torch.rand(num_points, 1, device=device)
-        w = torch.rand(num_points, 1, device=device)
+        # u = torch.rand(num_points, 1, device=device)
+        # v = torch.rand(num_points, 1, device=device)
+        # w = torch.rand(num_points, 1, device=device)
 
-        self.quats = torch.cat(
-            [
-                torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
-                torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
-                torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
-                torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
-            ],
-            -1,
-        )
+        # self.quats = torch.cat(
+        #     [
+        #         torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
+        #         torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
+        #         torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
+        #         torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
+        #     ],
+        #     -1,
+        # )
+
+        self.quats = torch.ones(num_points, 4, device=device)
+
+
         self.opacities = torch.ones((num_points, 1), device=device)
 
         # self.viewmat = torch.tensor(
@@ -194,7 +200,7 @@ class GaussModel(torch.nn.Module):
 
         self.means_3d.requires_grad = True
         self.scales.requires_grad = True
-        self.quats.requires_grad = True
+        # self.quats.requires_grad = True
         self.opacities.requires_grad = True
         # self.viewmat.requires_grad = False
 

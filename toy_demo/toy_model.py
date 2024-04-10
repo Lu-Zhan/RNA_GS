@@ -49,7 +49,7 @@ class SliceFixGaussModel(FixGaussModel):
         return out_img, new_conics, new_radii, xys
 
 
-gs_model = SliceFixGaussModel(num_primarys=1, num_backups=0, hw=(256, 256), device='cuda:0')
+gs_model = SliceFixGaussModel(num_primarys=1, num_backups=0, hw=(128, 128), device='cuda:0')
 gs_model.rgbs = torch.ones_like(gs_model.rgbs)[..., :1]
 gs_model.opacities = torch.ones_like(gs_model.opacities)[..., :1]
 gs_model.background = torch.zeros_like(gs_model.background)[..., :1]

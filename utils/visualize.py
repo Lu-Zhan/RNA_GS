@@ -88,7 +88,11 @@ def view_recon(pred, gt, resize=(192, 192)):
     # plt.subplots_adjust(top=1, bottom=0, left=0, right=1, wspace=0, hspace=0)
     # plt.margins(0, 0)
 
-    vmin = gt.ravel()[gt.ravel() > 0].min()
+    try:
+        vmin = gt.ravel()[gt.ravel() > 0].min()
+    except:
+        vmin = 0
+
     vmax = gt.ravel().max()
     # vmax = max(pred.max(), gt.max())
 
