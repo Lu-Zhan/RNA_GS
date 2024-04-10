@@ -39,8 +39,8 @@ process:
 
 data:
 
-  data_path: ../data/IM41340_full/IM41340regi/6/1_36
-  codebook_path: ../data/codebook.xlsx
+  data_path: ./data/rna_data_0407/IM41236/rawtiff/18/1_324
+  codebook_path: ./data/rna_data_0407/FullCodeR5.xlsx
 
 model:
   checkpoint_path: checkpoints

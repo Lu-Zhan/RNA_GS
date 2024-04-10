@@ -22,7 +22,7 @@ def main():
     parser.add_argument("--devices", nargs='+', default=[0])
     parser.add_argument("--config", type=str, default='configs/default_3d.yaml')
     parser.add_argument("--exp_name", type=str, default='')
-    parser.add_argument("--exp_dir", type=str, default='outputs_3d/')
+    parser.add_argument("--exp_dir", type=str, default='/home/home/ccnt_zq/zwx/RNA_GS/')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
     
@@ -55,6 +55,7 @@ def main():
     )
 
     # model & dataloader
+    print(config['data']['data_path'])
     train_dataset = RNADataset3D(hparams=config, mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=8)
 

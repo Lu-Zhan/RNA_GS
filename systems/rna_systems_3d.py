@@ -12,6 +12,7 @@ from utils.visualize import view_recon
 from utils.utils import read_codebook
 from systems.models import model_zoo
 from systems.cameras import SliceCamera
+from pathlib import Path
 
 
 class GSSystem3D(LightningModule):
@@ -71,7 +72,7 @@ class GSSystem3D(LightningModule):
 
     def training_step(self, batch, batch_idx):
         batch = batch[0]
-
+        
         if self.is_init_rgb is False and self.hparams['train']['init_rgb']:
             with torch.no_grad():
                 _, _, _, xys = self.gs_model.render(camera=self.cam_model)
@@ -212,7 +213,15 @@ class GSSystem3D(LightningModule):
             recon_images.save(os.path.join(self.save_folder, "recon", f"epoch_{self.global_step:05d}.png"))
             self.logger.experiment.log({"val_image": [wandb.Image(recon_images, caption="val_image")]}, step=self.global_step)
         
-        if self.global_step % 10000 == 0:
+        if self.global_step % 5000 == 0:
+            self.gs_model.save_3d_pts(
+                xys=xys,
+                batch=mdp_batch,
+                rna_class=self.rna_class,
+                rna_name=self.rna_name,
+                post_th=self.hparams['process']['bg_filter_th'],
+                path=os.path.join(self.save_folder, "3d_pts.pth"),
+            )
             view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes = self.gs_model.visualize_points(
                 xys=xys, 
                 batch=mdp_batch,

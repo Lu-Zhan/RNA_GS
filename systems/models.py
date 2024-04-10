@@ -9,7 +9,9 @@ from gsplat.rasterize import rasterize_gaussians
 from utils.utils import obtain_init_color, filter_by_background, write_to_csv
 from utils.visualize import view_positions, view_score_dist
 from systems.losses import obtain_simi
-
+from plyfile import PlyData, PlyElement
+from os import makedirs, path
+from errno import EEXIST
 
 class GaussModel(torch.nn.Module):
     def __init__(self, num_primarys, num_backups, device, camera, B_SIZE=16):
@@ -124,6 +126,22 @@ class GaussModel(torch.nn.Module):
             torch.sigmoid(self.rgbs[self.persistent_mask]),
             torch.sigmoid(self.opacities[self.persistent_mask]),
         )
+    
+    def construct_list_of_attributes(self):
+        means_3d, scales, quats, rgbs, opacities = self.obtain_data()
+        l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
+        # All channels except the 3 DC
+        for i in range(3):
+            l.append('f_dc_{}'.format(i))
+        for i in range(3):
+            l.append('f_rest_{}'.format(i))
+        l.append('opacity')
+        for i in range(3):
+            l.append('scale_{}'.format(i))
+        for i in range(2):
+            l.append('rot_{}'.format(i))
+        return l
+
 
     def maskout(self, indices):
         self.means_3d.data[indices, :] = 0.
@@ -390,6 +408,38 @@ class GaussModel(torch.nn.Module):
 
         # selected_classes=self.hparams['view']['classes']
         view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder)
+    
+    @torch.no_grad()
+    def save_3d_pts(self, xys, batch, rna_class, rna_name, post_th, path):
+        
+        max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+
+        cos_score, pred_rna_index, pred_rna_name = self.obtain_calibration(
+            rna_class, 
+            rna_name,
+        )
+
+        ref_score = cos_score * max_color_post
+
+        # filter out points with zero score
+        mask = ref_score > 0
+        means_3d, _, _, _, _ = self.obtain_data()
+        xys = xys[mask]
+        z = means_3d[:, 2][mask]
+        ref_score = ref_score[mask]
+        cos_score = cos_score[mask]
+        max_color_post = max_color_post[mask]
+        pred_rna_index = pred_rna_index[mask]
+        pred_rna_name = pred_rna_name[mask.cpu().numpy()]
+
+
+        torch.save({
+            'xy': torch.tensor(xys),
+            'z': torch.tensor(z),
+            'ref_score': torch.tensor(ref_score),
+        }, path)
 
 
 class FixGaussModel(GaussModel):

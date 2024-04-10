@@ -11,3 +11,7 @@ lightning_logs/
 test/
 archive/
 .vscode/
+*.ply
+*.ckpt
+*.pth
+*.csv
