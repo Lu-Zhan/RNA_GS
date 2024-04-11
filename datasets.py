@@ -46,14 +46,17 @@ def images_to_tensor(image_path: Path):
         img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
         images.append(img_tensor)
 
-    imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
-    imgs_tensor = torch.log10(imgs_tensor + 1)
+    imgs_tensor = torch.cat(images, dim=2) / 300.0 # [h, w, 15]
+    # imgs_tensor = torch.log10(imgs_tensor + 1)
 
-    all_pixels = imgs_tensor[..., :-1].reshape(-1)
-    top_min_values = torch.topk(-all_pixels, int(0.001 * all_pixels.shape[0])).values
+    # all_pixels = imgs_tensor[..., :-1].reshape(-1)
+    # top_min_values = torch.topk(-all_pixels, int(0.001 * all_pixels.shape[0])).values
 
-    min_value = -top_min_values.min()
-    max_value = all_pixels.max()
+    # min_value = -top_min_values.min()
+    # max_value = all_pixels.max()
+
+    min_value = 0
+    max_value = 1
 
     imgs_tensor = torch.relu(imgs_tensor - min_value) / (max_value - min_value)
 
@@ -94,7 +97,7 @@ def read_dapi_image(image_path: Path):
 
     imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
     imgs_tensor = torch.log10(imgs_tensor + 1) # / torch.log10(torch.tensor([2801])) # [h,w,15]
-    # imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
+    imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
 
     min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
     imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
