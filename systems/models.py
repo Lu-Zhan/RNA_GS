@@ -73,8 +73,6 @@ class GaussModel(torch.nn.Module):
             img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
         )
 
-
-
         W = cov3d[..., -1:]   # (n, 1)
         lam = 1 / (W + 1e-8)    # (n, 1)
         
@@ -96,6 +94,12 @@ class GaussModel(torch.nn.Module):
 
         # (n, 2, 1) + (n, 1, k) * (n, 2, 1) / (n, 1, 1) -> (n, 2, k)
         xys_z = xys[..., None] + delta_z[:, None, :] * V[..., None] / (W[..., None] + 1e-8)  # (n, 2, k)
+
+        # (n, 1, k)
+        # new_opacities = opacities[..., None] * scale_term[:, None, :]
+
+        # change cov2d to maintain the same scale of gaussian
+        new_conics = new_conics / scale_term
 
         out_imgs = []
         for k in range(xys_z.shape[-1]):

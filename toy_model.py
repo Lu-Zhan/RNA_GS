@@ -34,7 +34,8 @@ class SliceFixGaussModel(FixGaussModel):
 
         # depths = torch.ones_like(depths) * z_plane - camera_z
 
-        new_conics = conics / z_plane
+        new_conics = conics #   / z_plane
+        # opacities = opacities / z_plane
 
         out_img = rasterize_gaussians(
             xys=xys, 
@@ -43,12 +44,20 @@ class SliceFixGaussModel(FixGaussModel):
             conics=new_conics,
             num_tiles_hit=num_tiles_hit,
             colors=rgbs,
-            opacity=opacities,
+            opacity=opacities / z_plane,
             img_height=self.H, img_width=self.W, block_width=self.B_SIZE, background=self.background,
         )
 
         return out_img, new_conics, radii, xys
 
+
+camera = SliceCamera(
+        num_slice=40,
+        num_dims=1,
+        hw=(256, 256),
+        step_z=0.1,
+        camera_z=-8,
+)
 
 gs_model = SliceFixGaussModel(num_primarys=1, num_backups=0, hw=(128, 128), device='cuda:0')
 gs_model.rgbs = torch.ones_like(gs_model.rgbs)[..., :1]

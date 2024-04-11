@@ -15,7 +15,7 @@ if __name__ == '__main__':
     )
     gs_model = GaussModel(num_primarys=1, num_backups=0, device='cuda', camera=camera)
 
-    gs_model.rgbs = torch.ones_like(gs_model.rgbs)[..., :1]
+    gs_model.rgbs = torch.ones_like(gs_model.rgbs)[..., :1] 
     gs_model.opacities = torch.ones_like(gs_model.opacities)[..., :1]
     gs_model.background = torch.zeros_like(gs_model.background)[..., :1]
     # gs_model.means_3d = torch.zeros_like(gs_model.means_3d) #
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     gs_model.means_3d = torch.tensor([[0, 0, 0.]], device='cuda')
 
     gs_model.scales = torch.ones_like(gs_model.scales) * 2
-    gs_model.scales[:, -2] = gs_model.scales[:, -2] / 3
+    gs_model.scales[:, -2] = gs_model.scales[:, -2]
     gs_model.quats = torch.ones_like(gs_model.quats)
     # gs_model.scales = gs_model.scales / gs_model.scales.max()
 

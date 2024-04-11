@@ -9,7 +9,7 @@ class SliceCamera(nn.Module):
         num_slice,
         hw,
         num_dims,
-        step_z=0.05, 
+        step_z=0.025, 
         refine_camera=False, 
         camera_z=-8,
         device=torch.device('cuda:0'),
@@ -38,7 +38,7 @@ class SliceCamera(nn.Module):
         if refine_camera:
             self.camera_z.requires_grad = True
 
-        self.base_plane_zs = (torch.arange(num_slice, device=device) + 0.5) * step_z - num_slice / 2 * step_z - camera_z
+        self.base_plane_zs = (torch.arange(num_slice, device=device)) * step_z - num_slice / 2 * step_z - camera_z
     
     @property
     def viewmat(self):

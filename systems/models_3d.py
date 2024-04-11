@@ -73,30 +73,50 @@ class GaussModel(torch.nn.Module):
             img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
         )
 
-        c33 = 1 / cov3d[..., -1:]
-        camera_z = camera.camera_z
-        plane_zs = camera.plane_zs
+        W = cov3d[..., -1:]
+        # W = scales[:, 1] ** 2 / scales[:, 0] / scales[:, 2]
+        # lam = 1 / (W + 1e-8)    # (n, 1)
 
-        # means_3d (n, 3), z_plane (k)
+        lam = cov3d[..., 0:1] * cov3d[..., 3:4] / (W ** 2 + 1e-8)  # (n, 3)
+        
+        delta_z = camera.plane_zs[None, :] - means_3d[:, -1:]   # (n, k)
+        scale_term = torch.exp(-0.5 * lam * delta_z ** 2)   # (n, k)
 
-        # (1, k) - (n, 1) = (n, k), (n, 1) - (n, k) = (n, k)
-        term = torch.exp(-0.5 * c33 * (plane_zs[None, :] - means_3d[:, -1:]) ** 2)
+        U = torch.stack([cov3d[..., 0], cov3d[..., 1], cov3d[..., 3]], dim=-1)  # (n, 3)
+        V = torch.stack([cov3d[..., 2], cov3d[..., 4]], dim=-1) # (n, 2)
 
-        # (n, 1) / (1, k) = (n, k) * (n, k) = (n, k)
-        rescale_radii = (means_3d[..., -1:] - camera_z) /  (plane_zs[None, :] - camera_z) * term
+        # # matrix multiplication
+        # # (n, 2, 1) @ (n, 1, 2) -> (n, 2, 2)
+        # VV_t = torch.bmm(V[..., None], V[:, None, :])  # (n, 2, 2)V
 
-        # new_radii = torch.ceil(radii[:, None] * rescale_radii).to(radii.dtype)
+        # simply to vector computation
+        VV_t = torch.stack([V[..., 0] ** 2, V[..., 0] * V[..., 1], V[..., 1] ** 2], dim=-1)  # (n, 3)
 
-        # (n, 1, c) / (n, k, 1) = (n, k, c), add 1e-8 to avoid zero division
-        new_conics = conics[:, None, :] / (rescale_radii[..., None] ** 3 + 1e-8)
+        # (n, 3) - (n, 3) / (n, 1) -> (n, 3)
+        cov2d = U - VV_t / (W + 1e-8)  # (n, 3)
+
+        cov2d = torch.stack([cov2d[..., 0], cov2d[..., 1], cov2d[..., 1], cov2d[..., 2]], dim=-1)  # (n, 4)
+        cov2d = cov2d.reshape(-1, 2, 2)  # (n, 2, 2)
+        inv_cov2d = torch.inverse(cov2d)  # (n, 2, 2)
+        new_conics = torch.stack([inv_cov2d[..., 0, 0], inv_cov2d[..., 0, 1], inv_cov2d[..., 1, 1]], dim=-1)  # (n, 3)
+
+        # (n, 2, 1) + (n, 1, k) * (n, 2, 1) / (n, 1, 1) -> (n, 2, k)
+        xys_z = xys[..., None] + (delta_z[:, None, :] * V[..., None] / (W[..., None] + 1e-8)) * camera.W / 2  # (n, 2, k)
+
+        # (n, 1, k)
+        # new_opacities = opacities[..., None] * scale_term[:, None, :]
+
+        # change cov2d to maintain the same scale of gaussian
+        new_conics = new_conics[..., None] / (scale_term[:, None, :] + 1e-8)
 
         out_imgs = []
-        for k in range(new_conics.shape[1]):
+        for k in range(xys_z.shape[-1]):
             out_img = rasterize_gaussians(
-                xys=xys, 
+                xys=xys_z[..., k], 
                 depths=depths,
                 radii=radii,
-                conics=new_conics[:, k],
+                conics=new_conics[..., k],
+                # conics=new_conics,
                 num_tiles_hit=num_tiles_hit,
                 colors=rgbs,
                 opacity=opacities,
@@ -107,13 +127,13 @@ class GaussModel(torch.nn.Module):
         
         out_imgs = torch.stack(out_imgs, dim=0) # (k, h, w, 15)
         return out_imgs, new_conics, radii, xys
-    
+        
     @property
     def parameters(self):
         return (
             self.means_3d,
             self.scales,
-            # self.quats,
+            self.quats,
             self.rgbs,
             self.opacities,
         )
@@ -160,29 +180,27 @@ class GaussModel(torch.nn.Module):
         num_points = num_primarys + num_backups
 
         self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # change to x y
+        self.means_3d = torch.zeros(num_points, 3, device=device)
 
-        # self.means_3d = torch.zeros(num_points, 3, device=device)
+        # self.scales = torch.rand(num_points, 3, device=device) # * 0.5
+        self.scales = torch.ones(num_points, 3, device=device) * 110
+        self.scales[:, 1] = self.scales[:, 1] / 2.5
 
-        self.scales = torch.rand(num_points, 3, device=device) * 0.5
-        # self.scales = torch.ones(num_points, 3, device=device) * 2
-        # self.scales[:, -2] = self.scales[:, -2] / 3
+        u = torch.rand(num_points, 1, device=device)
+        v = torch.rand(num_points, 1, device=device)
+        w = torch.rand(num_points, 1, device=device)
 
-        # u = torch.rand(num_points, 1, device=device)
-        # v = torch.rand(num_points, 1, device=device)
-        # w = torch.rand(num_points, 1, device=device)
-
-        # self.quats = torch.cat(
-        #     [
-        #         torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
-        #         torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
-        #         torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
-        #         torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
-        #     ],
-        #     -1,
-        # )
+        self.quats = torch.cat(
+            [
+                torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
+                torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
+                torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
+                torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
+            ],
+            -1,
+        )
 
         self.quats = torch.ones(num_points, 4, device=device)
-
 
         self.opacities = torch.ones((num_points, 1), device=device)
 
@@ -200,7 +218,7 @@ class GaussModel(torch.nn.Module):
 
         self.means_3d.requires_grad = True
         self.scales.requires_grad = True
-        # self.quats.requires_grad = True
+        self.quats.requires_grad = True
         self.opacities.requires_grad = True
         # self.viewmat.requires_grad = False
 

@@ -205,14 +205,14 @@ class GSSystem3D(LightningModule):
             self.log_step('val/mean_psnr', mean_psnr, on_step=False, on_epoch=True, prog_bar=True)
             self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
-        if self.global_step % 5000 == 0:
+        if self.global_step % 1000 == 0:
             # visualization
             recon_images = view_recon(pred=mdp_output, gt=mdp_batch)
             recon_images = Image.fromarray(recon_images)
             recon_images.save(os.path.join(self.save_folder, "recon", f"epoch_{self.global_step:05d}.png"))
             self.logger.experiment.log({"val_image": [wandb.Image(recon_images, caption="val_image")]}, step=self.global_step)
         
-        if self.global_step % 10000 == 0:
+        if self.global_step % 2000 == 0:
             view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes = self.gs_model.visualize_points(
                 xys=xys, 
                 batch=mdp_batch,

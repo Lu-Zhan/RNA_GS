@@ -8,11 +8,11 @@
             "name": "debug train",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "train_3d.py",
             "console": "integratedTerminal",
             "args": [
                 "exp_name",
-                "debug",
+                "debug_3d",
             ]
         }
     ]
