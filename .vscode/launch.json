@@ -8,7 +8,7 @@
             "name": "debug train",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "train.py",
             "console": "integratedTerminal",
             "args": [
                 "exp_name",

@@ -15,8 +15,8 @@ torch.set_float32_matmul_precision('medium')
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])
-    parser.add_argument("--checkpoint_path", type=str, default='outputs/c6oci7nv/checkpoints/last.ckpt')
-    parser.add_argument("--id", type=str, default='')
+    parser.add_argument("--checkpoint_path", type=str, default='outputs/fmv3kke2/checkpoints/last.ckpt')
+    parser.add_argument("--id", type=str, default='fmv3kke2')
     args = parser.parse_args()
 
     # fix seed

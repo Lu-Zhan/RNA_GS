@@ -7,7 +7,7 @@ import numpy as np
 
 
 def crop_images(src_folder, hw):
-    images = glob.glob(os.path.join(src_folder, "*.png"))
+    images = glob.glob(os.path.join(src_folder, "*.tif"))
     print(f"Found {len(images)} images")
 
     for path in images:
@@ -27,7 +27,7 @@ def crop_images(src_folder, hw):
 
 
 def crop_images_by_tile_number(src_folder, tile_number):
-    images = glob.glob(os.path.join(src_folder, "*.png"))
+    images = glob.glob(os.path.join(src_folder, "*.tif"))
     print(f"Found {len(images)} images")
 
     for i in range(tile_number):

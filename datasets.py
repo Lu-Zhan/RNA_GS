@@ -36,7 +36,7 @@ class RNADataset(Dataset):
 
 
 def images_to_tensor(image_path: Path):
-    image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
+    image_paths = [image_path / f'F1R{r}Ch{c}.tif' for r in range(1, 6) for c in range(2, 5)]
 
     images = []
     transform = transforms.ToTensor()
@@ -49,10 +49,18 @@ def images_to_tensor(image_path: Path):
     imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
     imgs_tensor = torch.log10(imgs_tensor + 1)
 
-    min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
+    all_pixels = imgs_tensor[..., :-1].reshape(-1)
+    top_min_values = torch.topk(-all_pixels, int(0.001 * all_pixels.shape[0])).values
+
+    min_value = -top_min_values.min()
+    max_value = all_pixels.max()
+
+    imgs_tensor = torch.relu(imgs_tensor - min_value) / (max_value - min_value)
+
+    # min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
     imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
 
-    return imgs_tensor ** 0.5, (min_value, max_value)
+    return imgs_tensor ** 0.5, (0, max_value)
 
 
 # def images_to_tensor_cropped(image_path: Path):
@@ -74,7 +82,7 @@ def images_to_tensor(image_path: Path):
 
 
 def read_dapi_image(image_path: Path):
-    image_paths = [image_path / f'F1R{r}Ch1.png' for r in range(1, 6)]
+    image_paths = [image_path / f'F1R{r}Ch1.tif' for r in range(1, 6)]
 
     images = []
     transform = transforms.ToTensor()
