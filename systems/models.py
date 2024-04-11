@@ -73,30 +73,37 @@ class GaussModel(torch.nn.Module):
             img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
         )
 
-        c33 = 1 / cov3d[..., -1:]
-        camera_z = camera.camera_z
-        plane_zs = camera.plane_zs
 
-        # means_3d (n, 3), z_plane (k)
 
-        # (1, k) - (n, 1) = (n, k), (n, 1) - (n, k) = (n, k)
-        term = torch.exp(-0.5 * c33 * (plane_zs[None, :] - means_3d[:, -1:]) ** 2)
+        W = cov3d[..., -1:]   # (n, 1)
+        lam = 1 / (W + 1e-8)    # (n, 1)
+        
+        delta_z = camera.plane_zs[None, :] - means_3d[:, -1:]   # (n, k)
+        scale_term = torch.exp(-0.5 * lam * delta_z ** 2)   # (n, k)
 
-        # (n, 1) / (1, k) = (n, k) * (n, k) = (n, k)
-        rescale_radii = (means_3d[..., -1:] - camera_z) /  (plane_zs[None, :] - camera_z) * term
+        U = torch.stack([cov3d[..., 0], cov3d[..., 1], cov3d[..., 3]], dim=-1)  # (n, 3)
+        V = torch.stack([cov3d[..., 2], cov3d[..., 4]], dim=-1) # (n, 2)
+        VV_t = torch.sum(V ** 2, dim=-1, keepdim=True)  # (n,)
 
-        # new_radii = torch.ceil(radii[:, None] * rescale_radii).to(radii.dtype)
+        # (n, 3) - (n, 1) / (n, 1) -> (n, 3)
+        cov2d = U - VV_t / (W + 1e-8)  # (n, 3)
+        lam_cov2d = cov2d / (W + 1e-8)  # (n, 3)
 
-        # (n, 1, c) / (n, k, 1) = (n, k, c), add 1e-8 to avoid zero division
-        new_conics = conics[:, None, :] / (rescale_radii[..., None] ** 3 + 1e-8)
+        lam_cov2d = torch.stack([lam_cov2d[..., 0], lam_cov2d[..., 1], lam_cov2d[..., 1], lam_cov2d[..., 2]], dim=-1)  # (n, 4)
+        lam_cov2d = lam_cov2d.reshape(-1, 2, 2)  # (n, 2, 2)
+        inv_lam_cov2d = torch.inverse(lam_cov2d)  # (n, 2, 2)
+        new_conics = torch.stack([inv_lam_cov2d[..., 0, 0], inv_lam_cov2d[..., 0, 1], inv_lam_cov2d[..., 1, 1]], dim=-1)  # (n, 3)
+
+        # (n, 2, 1) + (n, 1, k) * (n, 2, 1) / (n, 1, 1) -> (n, 2, k)
+        xys_z = xys[..., None] + delta_z[:, None, :] * V[..., None] / (W[..., None] + 1e-8)  # (n, 2, k)
 
         out_imgs = []
-        for k in range(new_conics.shape[1]):
+        for k in range(xys_z.shape[-1]):
             out_img = rasterize_gaussians(
-                xys=xys, 
+                xys=xys_z[..., k], 
                 depths=depths,
                 radii=radii,
-                conics=new_conics[:, k],
+                conics=new_conics,
                 num_tiles_hit=num_tiles_hit,
                 colors=rgbs,
                 opacity=opacities,
