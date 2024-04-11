@@ -187,8 +187,8 @@ class GaussModel(torch.nn.Module):
     @torch.no_grad()
     def save_to_csv(self, xys, batch, rna_class, rna_name, hw, post_th, path):
         max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
-        max_color_post = max_color_post.max(dim=-1)[0] * 5
-        # max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
 
         cos_score, pred_rna_index, pred_rna_name = self.obtain_calibration(
             rna_class, 
@@ -225,12 +225,12 @@ class GaussModel(torch.nn.Module):
         mdp_dapi_image = mdp_dapi_image.cpu().numpy()
         mdp_image = batch.max(dim=-1)[0].cpu().numpy()
 
-        max_color = self.colors.max(dim=-1)[0] * 5
-        # max_color = max_color / (max_color.max() + 1e-8)
+        max_color = self.colors.max(dim=-1)[0]
+        max_color = max_color / (max_color.max() + 1e-8)
 
         max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
-        max_color_post = max_color_post.max(dim=-1)[0] * 5
-        # max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
 
         cos_score, _, pred_class_name = self.obtain_calibration(rna_class, rna_name)
 
@@ -278,12 +278,12 @@ class GaussModel(torch.nn.Module):
         points_xy = xys.cpu().numpy()
         mdp_dapi_image = mdp_dapi_image.cpu().numpy()
 
-        # max_color = self.colors.max(dim=-1)[0]
-        # max_color = max_color / (max_color.max() + 1e-8)
+        max_color = self.colors.max(dim=-1)[0]
+        max_color = max_color / (max_color.max() + 1e-8)
 
         max_color_post = self.post_colors(xys, batch, th=post_th)  # (n, 15)
-        max_color_post = max_color_post.max(dim=-1)[0] * 5
-        # max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
 
         cos_score, _, pred_class_name = self.obtain_calibration(rna_class, rna_name)
 
@@ -332,8 +332,8 @@ class GaussModel(torch.nn.Module):
             selected_classes=['Snap25', 'Slc17a7', 'Gad1', 'Gad2', 'Plp1', 'Mbp', 'Aqp4', 'Rgs5']
         ):
         max_color_post = self.post_colors(xys, batch, th=post_th)
-        max_color_post = max_color_post.max(dim=-1)[0] * 5
-        # max_color_post = max_color_post / (max_color_post.max() + 1e-8)
+        max_color_post = max_color_post.max(dim=-1)[0]
+        max_color_post = max_color_post / (max_color_post.max() + 1e-8)
 
         cos_score, _, pred_class_name = self.obtain_calibration(rna_class, rna_name)
 

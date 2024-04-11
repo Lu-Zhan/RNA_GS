@@ -31,7 +31,7 @@ loss:
   w_rho: 0
   w_radius: 0
   w_mi: 0
-  w_cos: 0
+  w_cos: 0.0001
 
 process:
   bg_filter_th: -1
@@ -39,7 +39,8 @@ process:
 data:
 
   # data_path: ../data/IM41340_full/IM41340regi/6/1_36
-  data_path: ../data/rna_data_0407/IM41441/Regied_Img_uint16
+  # data_path: ../data/rna_data_0407/IM41441/IM41441_mip_th5/6/1_36
+  data_path: ../data/rna_data_0407/IM41441/IM41441_mip_th5
   codebook_path: ../data/codebook.xlsx
 
 model:
