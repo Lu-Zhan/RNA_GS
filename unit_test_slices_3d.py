@@ -21,7 +21,8 @@ if __name__ == '__main__':
     gs_model.means_3d = torch.tensor([[0, 0, 0.]], device='cuda')
 
     gs_model.scales = torch.ones_like(gs_model.scales) * 1
-    # gs_model.scales[:, -2] = gs_model.scales[:, -2]
+    # gs_model.scales[:, -2] = gs_model.scales[:, -2] / 2
+    gs_model.scales[:, -2] /= 2
     gs_model.quats = torch.ones_like(gs_model.quats)
     # gs_model.scales = gs_model.scales / gs_model.scales.max()
 
