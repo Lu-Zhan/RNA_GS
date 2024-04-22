@@ -94,8 +94,8 @@ class GaussModel(torch.nn.Module):
         self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # [-1, 1]
 
         # radii ~ s * 3 * (w / 2) / 8 = s * w * 3 / 16
-        # point size (2-5 px), set range (0px, 12px), 128-0.5, 256-0.25, 64 / 128 = 0.5
-        self.scales = torch.rand(num_points, 3, device=device) / 2
+        # point size (2-5 px), set range (0px, 12px), 128-0.5, 256-0.25, 64 / 128 = 0.5, 64 / 64
+        self.scales = torch.rand(num_points, 3, device=device)
 
         u = torch.rand(num_points, 1, device=device)
         v = torch.rand(num_points, 1, device=device)

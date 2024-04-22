@@ -51,8 +51,11 @@ class GSSystem3D(LightningModule):
             self.rna_class, self.rna_name = read_codebook(path=self.hparams['data']['codebook_path'], bg=False)
             self.mi_rna_class, self.mi_rna_name = read_codebook(path=self.hparams['data']['codebook_path'], bg=True)
         else:
-            self.rna_class, self.rna_name = np.array([[1., 1., 1.]]), np.array(['full'])
-            self.mi_rna_class, self.mi_rna_name = np.array([[1., 1., 1.], [0., 0., 0.]]), np.array(['full', 'background'])
+            # self.rna_class, self.rna_name = np.array([[1., 1., 1.]]), np.array(['full'])
+            # self.mi_rna_class, self.mi_rna_name = np.array([[1., 1., 1.], [0., 0., 0.]]), np.array(['full', 'background'])
+
+            self.rna_class, self.rna_name = np.array([[1.]]), np.array(['full'])
+            self.mi_rna_class, self.mi_rna_name = np.array([[1.], [0.]]), np.array(['full', 'background'])
 
         self.rna_class = torch.tensor(self.rna_class, device=self.gs_model.means_3d.device, dtype=self.gs_model.means_3d.dtype)
         self.mi_rna_class = torch.tensor(self.mi_rna_class, device=self.gs_model.means_3d.device, dtype=self.gs_model.means_3d.dtype)

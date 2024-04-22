@@ -1,9 +1,9 @@
-exp_name: test_3d
+exp_name: test_3d_64
 
 train:
   lr: 0.005
-  iterations: 10000
-  num_primarys: 800
+  iterations: 20000
+  num_primarys: 200
   num_backups: 0
   tile_size: 16
   densification_start: 1000
@@ -42,7 +42,8 @@ data:
   # data_path: ../data/IM41340_full/IM41340_raw
   # data_path: ../data/IM41340_full/IM41340regi
   # data_path: ../data/IM41340_full/IM41340regi/6/1_36
-  data_path: ../data/rna_data_0407/IM41236/rawtiff/18/1_324
+  # data_path: ../data/rna_data_0407/IM41236/rawtiff/18/1_324
+  data_path: ../data/rna_data_0407/IM41236/rawtiff/36/1_1296
   # data_path: ../data/rna_data_0407/IM41236/cir_0.5_new
   # data_path: ../data/IM41340_tiled/1_36
   # codebook_path: ../data/codebook.xlsx
@@ -54,7 +55,7 @@ model:
   camera_z: -8
   step_z: 0.05
   num_slice: 46
-  num_dims: 3
+  num_dims: 1
 
 view:
   classes:

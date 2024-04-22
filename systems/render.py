@@ -4,7 +4,48 @@ from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
 
-# @torch.compile(mode='reduce-overhead')
+def render_slices_2d(
+        means_3d, scales, quats, rgbs, opacities, background, 
+        camera, B_SIZE
+    ):
+
+    xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
+        means3d=means_3d,
+        scales=scales,
+        glob_scale=1,
+        quats=quats,
+        viewmat=camera.viewmat,
+        projmat=camera.viewmat,
+        fx=camera.focal, fy=camera.focal, cx=camera.W / 2, cy=camera.H / 2,
+        img_height=camera.H, img_width=camera.W, block_width=B_SIZE,
+    )
+
+    xys_z, conics_z, new_rgbs = _obtain_slice_info(
+        means_3d=means_3d, cov3d=cov3d, rgbs=rgbs, xys=xys,
+        camera=camera,
+    )
+    
+    out_imgs = []
+    for k in range(xys_z.shape[-1]):
+        out_img = rasterize_gaussians(
+            xys=xys_z[..., k], 
+            depths=depths,
+            radii=radii,
+            conics=conics_z[..., k],
+            num_tiles_hit=num_tiles_hit,
+            colors=new_rgbs[..., k],
+            opacity=opacities,
+            img_height=camera.H, img_width=camera.W, block_width=B_SIZE, background=background,
+        )
+
+        out_imgs.append(out_img)
+    
+    out_imgs = torch.stack(out_imgs, dim=0) # (k, h, w, 15)
+    torch.cuda.empty_cache()
+
+    return out_imgs, conics, radii, xys
+
+
 def _obtain_slice_info(
         means_3d, cov3d, rgbs, xys,
         camera,
@@ -49,53 +90,6 @@ def _obtain_slice_info(
     conics_z = conics_z[..., None] / (s[:, None, :] ** 2 + 1e-8) 
 
     return xys_z, conics_z, rgbs_z
-
-
-__obtain_slice_info = torch.compile(_obtain_slice_info, mode='reduce-overhead')
-
-def render_slices_2d(
-        means_3d, scales, quats, rgbs, opacities, background, 
-        camera, B_SIZE
-    ):
-
-    xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
-        means3d=means_3d,
-        scales=scales,
-        glob_scale=1,
-        quats=quats,
-        viewmat=camera.viewmat,
-        projmat=camera.viewmat,
-        fx=camera.focal, fy=camera.focal, cx=camera.W / 2, cy=camera.H / 2,
-        img_height=camera.H, img_width=camera.W, block_width=B_SIZE,
-    )
-
-    xys_z, conics_z, new_rgbs = __obtain_slice_info(
-        means_3d=means_3d, cov3d=cov3d, rgbs=rgbs, xys=xys,
-        camera=camera,
-    )
-    
-    out_imgs = []
-    for k in range(xys_z.shape[-1]):
-        out_img = rasterize_gaussians(
-            xys=xys_z[..., k], 
-            depths=depths,
-            radii=radii,
-            conics=conics_z[..., k],
-            num_tiles_hit=num_tiles_hit,
-            colors=new_rgbs[..., k],
-            opacity=opacities,
-            img_height=camera.H, img_width=camera.W, block_width=B_SIZE, background=background,
-        )
-
-        out_imgs.append(out_img)
-    
-    out_imgs = torch.stack(out_imgs, dim=0) # (k, h, w, 15)
-    torch.cuda.empty_cache()
-
-    return out_imgs, conics, radii, xys
-
-
-
 
 
 def render_image(
