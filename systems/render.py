@@ -6,7 +6,7 @@ from gsplat.rasterize import rasterize_gaussians
 
 def render_slices_2d(
         means_3d, scales, quats, rgbs, opacities, background, 
-        camera, B_SIZE
+        camera, B_SIZE, index,
     ):
 
     xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
@@ -22,7 +22,7 @@ def render_slices_2d(
 
     xys_z, conics_z, new_rgbs = _obtain_slice_info(
         means_3d=means_3d, cov3d=cov3d, rgbs=rgbs, xys=xys,
-        camera=camera,
+        camera=camera, index=index,
     )
     
     out_imgs = []
@@ -41,14 +41,14 @@ def render_slices_2d(
         out_imgs.append(out_img)
     
     out_imgs = torch.stack(out_imgs, dim=0) # (k, h, w, 15)
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
 
     return out_imgs, conics, radii, xys
 
 
 def _obtain_slice_info(
         means_3d, cov3d, rgbs, xys,
-        camera,
+        camera, index,
     ):
     # cov3d: (n, 6), [
     #     0, 1, 2,
@@ -60,11 +60,14 @@ def _obtain_slice_info(
     V = torch.stack([cov3d[..., 2], cov3d[..., 4]], dim=-1) # (n, 2)
     W = cov3d[..., -1:] # (n, 1)
 
-    delta_z = camera.plane_zs[None, :] - means_3d[:, -1:]   # (n, k)
+    if index is None:
+        index = torch.arange(camera.plane_zs.shape[0], device=means_3d.device, dtype=torch.long)
+
+    delta_z = camera.plane_zs[None, index] - means_3d[:, -1:]   # (n, k)
 
     # x y z axis [-1, 1] -> [-(w / 2) / s, (w / 2) / s] -> * 8
     # transform conics and scale_term from 2D slice space to camera space        
-    distance_z = camera.plane_zs[None, :] - camera.camera_z.reshape(1, 1)   # (n, k)
+    distance_z = camera.plane_zs[None, index] - camera.camera_z.reshape(1, 1)   # (n, k)
     s = camera.focal / (distance_z + 1e-8)   # 64 / 8 = 8 
     delta_z_px = delta_z * s   # (n, k)
 

@@ -8,7 +8,7 @@
             "name": "debug train",
             "type": "debugpy",
             "request": "launch",
-            "program": "train_3d.py",
+            "program": "train_3d_rand.py",
             "console": "integratedTerminal",
             "args": [
                 "exp_name",

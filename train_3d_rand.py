@@ -10,17 +10,17 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
-from systems import GSSystem3D
-from datasets import RNADataset3D
+from systems import GSSystem3DRand
+from datasets import RNADataset3DRand
 
 torch.set_float32_matmul_precision('medium')
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])
-    parser.add_argument("--config", type=str, default='configs/default_3d.yaml')
+    parser.add_argument("--config", type=str, default='configs/default_3d_rand.yaml')
     parser.add_argument("--exp_name", type=str, default='')
-    parser.add_argument("--exp_dir", type=str, default='outputs_3d/')
+    parser.add_argument("--exp_dir", type=str, default='outputs_3d_rand/')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
     
@@ -53,15 +53,15 @@ def main():
     )
 
     # model & dataloader
-    train_dataset = RNADataset3D(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=8)
+    train_dataset = RNADataset3DRand(hparams=config, mode='train')
+    train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
 
-    val_dataset = RNADataset3D(hparams=config, mode='val')
+    val_dataset = RNADataset3DRand(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range
-    gs_system = GSSystem3D(hparams=config, dapi_images=train_dataset.dapi_images)
+    gs_system = GSSystem3DRand(hparams=config, dapi_images=train_dataset.dapi_images)
 
     trainer = Trainer(
         benchmark=True,
@@ -85,7 +85,7 @@ def main():
         val_dataloaders=val_dataloader,
     )
 
-    gs_system = GSSystem3D.load_from_checkpoint(checkpoint_callback.best_model_path)
+    gs_system = GSSystem3DRand.load_from_checkpoint(checkpoint_callback.best_model_path)
     trainer.predict(model=gs_system, dataloaders=val_dataloader)
 
 

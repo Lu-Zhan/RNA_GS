@@ -1,4 +1,4 @@
-exp_name: test_3d_2304
+exp_name: test_3d_2304_rand
 
 train:
   lr: 0.005
@@ -14,6 +14,7 @@ train:
   init_rgb: 1
   color_bias: 0.01
   refine_camera: 0
+  batch_size: 4
 
 loss:
   w_l1: 0

@@ -29,7 +29,7 @@ class GaussModel(torch.nn.Module):
             background=self.background, camera=camera, B_SIZE=self.B_SIZE,
         )
     
-    def render_slices(self, camera=None):
+    def render_slices(self, camera=None, index=None):
         if camera is None:
             camera = self.camera
 
@@ -37,7 +37,7 @@ class GaussModel(torch.nn.Module):
 
         return render_slices_2d(
             means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
-            background=self.background, camera=camera, B_SIZE=self.B_SIZE,
+            background=self.background, camera=camera, B_SIZE=self.B_SIZE, index=index,
         )
         
     @property
