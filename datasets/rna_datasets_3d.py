@@ -22,7 +22,7 @@ class RNADataset3D(Dataset):
 
         self.gt_images = self.gt_images * (1 - self.color_bias * 2) + self.color_bias
 
-        self.num_iters = hparams['train']['iterations']
+        # self.num_iters = hparams['train']['iterations']
         self.mode = mode
         
     def __len__(self):
@@ -42,7 +42,7 @@ class RNADataset3D(Dataset):
 class RNADataset3DRand(RNADataset3D):
     def __len__(self):
         if self.mode == 'train':
-            return self.num_iters
+            return 10000
         else:
             return self.gt_images.shape[0]
 

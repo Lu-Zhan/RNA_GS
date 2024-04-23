@@ -6,7 +6,7 @@ import numpy as np
 from utils.utils import obtain_init_color, filter_by_background, write_to_csv
 from utils.visualize import view_positions, view_score_dist
 from systems.losses import obtain_simi
-from systems.render import render_slices_2d, render_image
+from systems.render import render_slice_2d, render_image
 
 
 class GaussModel(torch.nn.Module):
@@ -29,16 +29,36 @@ class GaussModel(torch.nn.Module):
             background=self.background, camera=camera, B_SIZE=self.B_SIZE,
         )
     
-    def render_slices(self, camera=None, index=None):
+    def render_slice(self, camera=None, index=None):
         if camera is None:
             camera = self.camera
 
         means_3d, scales, quats, rgbs, opacities = self.obtain_data()
 
-        return render_slices_2d(
+        return render_slice_2d(
             means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
             background=self.background, camera=camera, B_SIZE=self.B_SIZE, index=index,
         )
+    
+    def render_all_slices(self, camera=None, num_slice=40):
+        if camera is None:
+            camera = self.camera
+
+        means_3d, scales, quats, rgbs, opacities = self.obtain_data()
+
+        indexs = torch.arange(num_slice, device=means_3d.device, dtype=torch.long)
+
+        outputs = []
+        for index in indexs:
+            out_image = render_slice_2d(
+                means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
+                background=self.background, camera=camera, B_SIZE=self.B_SIZE, index=index,
+            )[0]
+
+            outputs.append(out_image)
+        
+        return torch.cat(outputs, dim=0)
+
         
     @property
     def parameters(self):

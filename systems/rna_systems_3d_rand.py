@@ -13,6 +13,8 @@ from utils.utils import read_codebook
 from systems.models_3d import model_zoo
 from systems.cameras import SliceCamera
 
+import time
+
 
 class GSSystem3DRand(LightningModule):
     def __init__(self, hparams, **kwargs):  
@@ -95,7 +97,7 @@ class GSSystem3DRand(LightningModule):
             if self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
                 self.prune_points()
 
-        output, conics, radii, _ = self.gs_model.render_slices(camera=self.cam_model, index=index)
+        output, conics, radii, _ = self.gs_model.render_slice(camera=self.cam_model, index=index)
 
         # output = mdp_slices.max(dim=0)[0]   # (n, h, w, k) -> (h, w, k)
         mdp_output = output.max(dim=-1)[0]  #.max(dim=0)[0]   # (n, h, w, k) -> (h, w)
@@ -132,15 +134,15 @@ class GSSystem3DRand(LightningModule):
             loss += self.hparams['loss']['w_bg_l1'] * loss_bg_l1
             self.log_step("train/loss_bg_l1", loss_bg_l1)
 
-        if self.hparams['loss']['w_rho'] > 0:
-            loss_rho = rho_loss(conics)
-            loss += self.hparams['loss']['w_rho'] * loss_rho
-            self.log_step("train/loss_rho", loss_rho)
+        # if self.hparams['loss']['w_rho'] > 0:
+        #     loss_rho = rho_loss(conics)
+        #     loss += self.hparams['loss']['w_rho'] * loss_rho
+        #     self.log_step("train/loss_rho", loss_rho)
         
-        if self.hparams['loss']['w_radius'] > 0:
-            loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
-            loss += self.hparams['loss']['w_radius'] * loss_radius
-            self.log_step("train/loss_radius", loss_radius)
+        # if self.hparams['loss']['w_radius'] > 0:
+        #     loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
+        #     loss += self.hparams['loss']['w_radius'] * loss_radius
+        #     self.log_step("train/loss_radius", loss_radius)
             
         # losses for map image
         if self.hparams['loss']['w_mdp_l2'] > 0:
@@ -186,20 +188,19 @@ class GSSystem3DRand(LightningModule):
         # if self.hparams['loss']['w_cos'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
         #     loss += self.hparams['loss']['w_cos'] * loss_cos
         
+
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
-        self.log_step("params/num_samples", self.gs_model.current_num_samples, prog_bar=True)
+        self.log_step("params/num_samples", self.gs_model.current_num_samples)
 
         return loss
     
-    def obtain_output(self, batch_idx):
-        output, _, _, xys = self.gs_model.render_slices(camera=self.cam_model, index=batch_idx)
+    def obtain_output(self, index):
+        output, _, _, xys = self.gs_model.render_slice(camera=self.cam_model, index=index)
 
         return output, xys
 
     def forward_evaluation(self, output, batch, xys, is_predict=False, log_each_plane=False):
-        # batch = batch[0]
-        # output, _, _, xys = self.gs_model.render_slices(camera=self.cam_model, index=batch_idx)
 
         output = self._original(output)
         batch = self._original(batch)
@@ -327,6 +328,8 @@ class GSSystem3DRand(LightningModule):
         gt = [x[1] for x in self.validation_step_outputs]
         xys = self.validation_step_outputs[0][0][1] # (n, 2)
 
+        self.validation_step_outputs.clear()
+
         recon = torch.cat(recon, dim=0) # (k, h, w, c)
         gt = torch.cat(gt, dim=0) # (k, h, w, c)
 
@@ -337,9 +340,11 @@ class GSSystem3DRand(LightningModule):
         self.predict_step_outputs.append((self.obtain_output(index), batch))
     
     def on_predict_epoch_end(self):
-        recon = [x[0][0] for x in self.validation_step_outputs]
-        gt = [x[1] for x in self.validation_step_outputs]
-        xys = self.validation_step_outputs[0][0][1] # (n, 2)
+        recon = [x[0][0] for x in self.predict_step_outputs]
+        gt = [x[1] for x in self.predict_step_outputs]
+        xys = self.predict_step_outputs[0][0][1] # (n, 2)
+
+        self.predict_step_outputs.clear()
 
         recon = torch.cat(recon, dim=0) # (k, h, w, c)
         gt = torch.cat(gt, dim=0) # (k, h, w, c)

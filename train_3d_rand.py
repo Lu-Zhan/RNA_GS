@@ -54,7 +54,7 @@ def main():
 
     # model & dataloader
     train_dataset = RNADataset3DRand(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=8)
 
     val_dataset = RNADataset3DRand(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
@@ -69,14 +69,13 @@ def main():
         callbacks=[checkpoint_callback],
         devices=config['devices'],
         accelerator="gpu",
-        max_epochs=-1,
-        max_steps=config['train']['iterations'],
-        precision="16-mixed",
+        max_epochs=config['train']['max_epochs'],
+        precision="32-true",
         log_every_n_steps=50,
         strategy="auto",
-        val_check_interval=2000,
+        check_val_every_n_epoch=10,
         enable_model_summary=False,
-        num_sanity_val_steps=1,
+        num_sanity_val_steps=0,
     )
 
     trainer.fit(

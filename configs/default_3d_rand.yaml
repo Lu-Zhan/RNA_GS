@@ -2,7 +2,7 @@ exp_name: test_3d_2304_rand
 
 train:
   lr: 0.005
-  iterations: 20000
+  max_epochs: 100
   num_primarys: 100000
   num_backups: 0
   tile_size: 16
@@ -14,7 +14,6 @@ train:
   init_rgb: 1
   color_bias: 0.01
   refine_camera: 0
-  batch_size: 4
 
 loss:
   w_l1: 0
