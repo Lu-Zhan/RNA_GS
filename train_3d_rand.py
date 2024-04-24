@@ -18,7 +18,7 @@ torch.set_float32_matmul_precision('medium')
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])
-    parser.add_argument("--config", type=str, default='configs/default_3d_rand.yaml')
+    parser.add_argument("--config", type=str, default='configs/crop64_rawtiff.yaml')
     parser.add_argument("--exp_name", type=str, default='')
     parser.add_argument("--exp_dir", type=str, default='outputs_3d_rand/')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
@@ -54,7 +54,7 @@ def main():
 
     # model & dataloader
     train_dataset = RNADataset3DRand(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=8)
+    train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
 
     val_dataset = RNADataset3DRand(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
@@ -73,7 +73,7 @@ def main():
         precision="32-true",
         log_every_n_steps=50,
         strategy="auto",
-        check_val_every_n_epoch=10,
+        check_val_every_n_epoch=1,
         enable_model_summary=False,
         num_sanity_val_steps=0,
     )

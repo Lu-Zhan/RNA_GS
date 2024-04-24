@@ -4,7 +4,8 @@ import torch
 import numpy as np
 
 from utils.utils import obtain_init_color, filter_by_background, write_to_csv
-from utils.visualize import view_positions, view_score_dist
+from utils.vis2d_utils import view_positions, view_score_dist
+from utils.vis3d_utils import view_3d
 from systems.losses import obtain_simi
 from systems.render import render_single_slice, render_multi_slices, render_image
 
@@ -324,6 +325,25 @@ class GaussModel(torch.nn.Module):
 
         # selected_classes=self.hparams['view']['classes']
         view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder)
+
+    @torch.no_grad()
+    def visualize_3d(self, save_folder):
+        means_3d, scales, quats = self.obtain_data()[:3]
+        colors = self.colors
+        
+        mask = (torch.abs(means_3d[:, 0]) <= -1) & (torch.abs(means_3d[:, 1]) <= -1) & (torch.min(colors, dim=-1) > 0.05)
+        means_3d = means_3d[mask].data.cpu().numpy()
+        scales = scales[mask].data.cpu().numpy()
+        quats = quats[mask].data.cpu().numpy()
+        # colors = colors[mask].data.cpu().numpy()
+
+        view_3d(
+            means_3d=means_3d, 
+            scales=scales,
+            quats=quats, 
+            colors=None, 
+            save_path=os.path.join(save_folder, "view_3d.ply")
+        )
 
 
 class FixGaussModel(GaussModel):

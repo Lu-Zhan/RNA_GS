@@ -18,7 +18,7 @@ if __name__ == '__main__':
     gs_model.rgbs = torch.ones_like(gs_model.rgbs)[..., :1] 
     gs_model.opacities = torch.ones_like(gs_model.opacities)[..., :1]
     gs_model.background = torch.zeros_like(gs_model.background)[..., :1]
-    gs_model.means_3d = torch.tensor([[0, 0, -0.5]], device='cuda')
+    gs_model.means_3d = torch.tensor([[0, 0, 0.5]], device='cuda')
 
     gs_model.scales = torch.ones_like(gs_model.scales) * 2
     # gs_model.scales[:, -2] = gs_model.scales[:, -2] / 2
@@ -36,12 +36,12 @@ if __name__ == '__main__':
     images = gs_model.render_slice(camera=camera, index=[x for x in range(h*w)])[0] # (20, h, w, 1)
     end1 = time.time()
 
-    image_list = []
-    for i in range(0, h * w):
-        image = gs_model.render_slice(camera=camera, index=[i])[0] # (1, h, w, 1)
-        image_list.append(image)
+    # image_list = []
+    # for i in range(0, h * w):
+    #     image = gs_model.render_slice(camera=camera, index=[i])[0] # (1, h, w, 1)
+    #     image_list.append(image)
     
-    images = torch.cat(image_list, dim=0) # (20, h, w, 1)
+    # images = torch.cat(image_list, dim=0) # (20, h, w, 1)
 
     end2 = time.time()
 

@@ -8,7 +8,7 @@ from torch import optim
 from lightning import LightningModule
 
 from systems.losses import *
-from utils.visualize import view_recon
+from utils.vis2d_utils import view_recon
 from utils.utils import read_codebook
 from systems.models_3d import model_zoo
 from systems.cameras import SliceCamera
@@ -218,101 +218,102 @@ class GSSystem3DRand(LightningModule):
             self.log_step('val/mean_psnr', mean_psnr, on_step=False, on_epoch=True, prog_bar=True)
             self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
-        if self.global_step % 1000 == 0:
-            # visualization
-            recon_images = view_recon(pred=mdp_output, gt=mdp_batch)
-            recon_images = Image.fromarray(recon_images)
-            recon_images.save(os.path.join(self.save_folder, "recon", f"epoch_{self.global_step:05d}.png"))
-            self.logger.experiment.log({"val_image": [wandb.Image(recon_images, caption="val_image")]}, step=self.global_step)
+        # visualization
+        recon_images = view_recon(pred=mdp_output, gt=mdp_batch)
+        recon_images = Image.fromarray(recon_images)
+        recon_images.save(os.path.join(self.save_folder, "recon", f"epoch_{self.global_step:05d}.png"))
+        self.logger.experiment.log({"val_image": [wandb.Image(recon_images, caption="val_image")]}, step=self.global_step)
         
-        if self.global_step % 2000 == 0:
-            view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes = self.gs_model.visualize_points(
+        view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes = self.gs_model.visualize_points(
+            xys=xys, 
+            batch=mdp_batch,
+            mdp_dapi_image=self.mdp_dapi_image,
+            post_th=self.hparams['process']['bg_filter_th'],
+            rna_class=self.rna_class, 
+            rna_name=self.rna_name,
+            selected_classes=self.hparams['view']['classes'],
+        )
+
+        view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
+        view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
+        view_on_image_cos.save(os.path.join(self.save_folder, f"positions_mdp_cos.png"))
+        view_on_image_ref.save(os.path.join(self.save_folder, f"positions_mdp_ref.png"))
+        
+        for i, view_class in enumerate(view_classes):
+            view_class.save(os.path.join(self.save_folder, 'classes', f"positions_class_{self.hparams['view']['classes'][i]}.png"))
+
+        # visualization
+        recon_images = [Image.fromarray(view_recon(pred=x, gt=y)) for x, y in zip(output, batch)]
+
+        for i, image in enumerate(recon_images):
+            image.save(os.path.join(self.save_folder, "recon_plane", f"epoch_{self.global_step:05d}_{i}.png"))
+        
+        # 3d visualization
+        self.gs_model.visualize_3d(save_folder=self.save_folder)
+
+        if not is_predict:
+            self.logger.experiment.log({
+                "positions": [
+                    wandb.Image(view_on_image, caption="mdp"),
+                    wandb.Image(view_on_image_post, caption="mdp_post"),
+                    wandb.Image(view_on_image_cos, caption="mdp_cos"),
+                    wandb.Image(view_on_image_ref, caption="mdp_ref"),
+                ],
+                "positions_classes": [
+                    wandb.Image(x, caption=f"pos_{self.hparams['view']['classes'][i]}") for i, x in enumerate(view_classes)
+                ],
+            })
+
+            if log_each_plane:
+                self.logger.experiment.log({
+                    "recon_plane": [
+                        wandb.Image(x, caption=f"plane_{i}") for i, x in enumerate(recon_images)
+                    ],
+                })
+
+        if is_predict or (self.global_step > 0):
+            self.gs_model.save_to_csv(
+                xys=xys,
+                batch=mdp_batch,
+                rna_class=self.rna_class,
+                rna_name=self.rna_name,
+                hw=self.hparams['hw'],
+                post_th=self.hparams['process']['bg_filter_th'],
+                path=os.path.join(self.save_folder, "results.csv"),
+            )
+
+        if is_predict:
+            # merge all images
+            view_classes = [np.array(x) for x in view_classes]  # [(h, w, 3) * 8]
+            view_classes = np.concatenate(view_classes, axis=1) # (h, 8w, 3)
+            view_classes = Image.fromarray(view_classes)
+            view_classes.save(os.path.join(self.save_folder, f"positions_classes.png"))
+
+            # show top k classes
+            top_classes, selected_classes = self.gs_model.visualize_top_classes(
                 xys=xys, 
                 batch=mdp_batch,
                 mdp_dapi_image=self.mdp_dapi_image,
                 post_th=self.hparams['process']['bg_filter_th'],
                 rna_class=self.rna_class, 
                 rna_name=self.rna_name,
-                selected_classes=self.hparams['view']['classes'],
+                top_k=10,
             )
 
-            view_on_image.save(os.path.join(self.save_folder, f"positions_mdp.png"))
-            view_on_image_post.save(os.path.join(self.save_folder, f"positions_mdp_post.png"))
-            view_on_image_cos.save(os.path.join(self.save_folder, f"positions_mdp_cos.png"))
-            view_on_image_ref.save(os.path.join(self.save_folder, f"positions_mdp_ref.png"))
+            os.makedirs(os.path.join(self.save_folder, 'classes_top10'), exist_ok=True)
+            for i, selected_class in enumerate(top_classes):
+                selected_class.save(os.path.join(self.save_folder, 'classes_top10', f"positions_{i}_{selected_classes[i]}.png"))
             
-            for i, view_class in enumerate(view_classes):
-                view_class.save(os.path.join(self.save_folder, 'classes', f"positions_class_{self.hparams['view']['classes'][i]}.png"))
-
-            # visualization
-            recon_images = [Image.fromarray(view_recon(pred=x, gt=y)) for x, y in zip(output, batch)]
-
-            for i, image in enumerate(recon_images):
-                image.save(os.path.join(self.save_folder, "recon_plane", f"epoch_{self.global_step:05d}_{i}.png"))
-
-            if not is_predict:
-                self.logger.experiment.log({
-                    "positions": [
-                        wandb.Image(view_on_image, caption="mdp"),
-                        wandb.Image(view_on_image_post, caption="mdp_post"),
-                        wandb.Image(view_on_image_cos, caption="mdp_cos"),
-                        wandb.Image(view_on_image_ref, caption="mdp_ref"),
-                    ],
-                    "positions_classes": [
-                        wandb.Image(x, caption=f"pos_{self.hparams['view']['classes'][i]}") for i, x in enumerate(view_classes)
-                    ],
-                })
-
-                if log_each_plane:
-                    self.logger.experiment.log({
-                        "recon_plane": [
-                            wandb.Image(x, caption=f"plane_{i}") for i, x in enumerate(recon_images)
-                        ],
-                    })
-
-            if is_predict or (self.global_step > 0):
-                self.gs_model.save_to_csv(
-                    xys=xys,
-                    batch=mdp_batch,
-                    rna_class=self.rna_class,
-                    rna_name=self.rna_name,
-                    hw=self.hparams['hw'],
-                    post_th=self.hparams['process']['bg_filter_th'],
-                    path=os.path.join(self.save_folder, "results.csv"),
-                )
-
-            if is_predict:
-                # merge all images
-                view_classes = [np.array(x) for x in view_classes]  # [(h, w, 3) * 8]
-                view_classes = np.concatenate(view_classes, axis=1) # (h, 8w, 3)
-                view_classes = Image.fromarray(view_classes)
-                view_classes.save(os.path.join(self.save_folder, f"positions_classes.png"))
-
-                # show top k classes
-                top_classes, selected_classes = self.gs_model.visualize_top_classes(
-                    xys=xys, 
-                    batch=mdp_batch,
-                    mdp_dapi_image=self.mdp_dapi_image,
-                    post_th=self.hparams['process']['bg_filter_th'],
-                    rna_class=self.rna_class, 
-                    rna_name=self.rna_name,
-                    top_k=10,
-                )
-
-                os.makedirs(os.path.join(self.save_folder, 'classes_top10'), exist_ok=True)
-                for i, selected_class in enumerate(top_classes):
-                    selected_class.save(os.path.join(self.save_folder, 'classes_top10', f"positions_{i}_{selected_classes[i]}.png"))
-                
-                # show score distribution
-                self.gs_model.visualize_score_dist(
-                    xys=xys, 
-                    batch=mdp_batch,
-                    post_th=self.hparams['process']['bg_filter_th'],
-                    rna_class=self.rna_class, 
-                    rna_name=self.rna_name,
-                    save_folder=self.save_folder,
-                    selected_classes=self.hparams['view']['classes'],
-                )
+            # show score distribution
+            self.gs_model.visualize_score_dist(
+                xys=xys, 
+                batch=mdp_batch,
+                post_th=self.hparams['process']['bg_filter_th'],
+                rna_class=self.rna_class, 
+                rna_name=self.rna_name,
+                save_folder=self.save_folder,
+                selected_classes=self.hparams['view']['classes'],
+            )
                 
         return mean_psnr
 

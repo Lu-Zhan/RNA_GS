@@ -10,7 +10,7 @@ from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
 from systems.losses import *
-from utils.visualize import view_recon
+from utils.vis2d_utils import view_recon
 from utils.utils import read_codebook
 from systems.models import model_zoo
 from systems.cameras import SliceCamera

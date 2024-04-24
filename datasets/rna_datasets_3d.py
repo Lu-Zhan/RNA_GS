@@ -16,7 +16,7 @@ class RNADataset3D(Dataset):
         self.gt_images, self.range = read_images(path)
 
         self.dapi_images =self.gt_images[..., :1]   # (n, h, w, 1)
-        self.gt_images = self.gt_images[..., 1:]    # (n, h, w, c)
+        self.gt_images = self.gt_images[..., 1:1+hparams['model']['num_dims']]    # (n, h, w, c)
 
         self.color_bias = hparams['train']['color_bias']
 
@@ -42,7 +42,7 @@ class RNADataset3D(Dataset):
 class RNADataset3DRand(RNADataset3D):
     def __len__(self):
         if self.mode == 'train':
-            return 10000
+            return 100000
         else:
             return self.gt_images.shape[0]
 

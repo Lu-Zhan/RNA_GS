@@ -7,7 +7,7 @@ from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
 from utils.utils import obtain_init_color, filter_by_background, write_to_csv
-from utils.visualize import view_positions, view_score_dist
+from utils.vis2d_utils import view_positions, view_score_dist
 from systems.losses import obtain_simi
 
 
