@@ -80,7 +80,7 @@ def read_images(image_path: Path):
     imgs_tensor = torch.log10(imgs_tensor + 1)
 
     dapi_tensor = imgs_tensor[..., :1]
-    imgs_tensor = imgs_tensor[..., 1:2]  # (n, h, w, k)
+    imgs_tensor = imgs_tensor[..., 1:]  # (n, h, w, k)
 
     all_pixels = imgs_tensor.reshape(-1, imgs_tensor.shape[-1]) # (m, k)
     top_min_values = torch.topk(-all_pixels, int(0.01 * all_pixels.shape[0]), dim=0)[0] # (0.01 * m, k)

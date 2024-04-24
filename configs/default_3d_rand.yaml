@@ -3,7 +3,7 @@ exp_name: test_3d_2304_rand
 train:
   lr: 0.005
   max_epochs: 100
-  num_primarys: 100000
+  num_primarys: 280000
   num_backups: 0
   tile_size: 16
   densification_start: 1000
@@ -52,7 +52,7 @@ model:
   camera_z: -8
   step_z: 0.05
   num_slice: 46
-  num_dims: 1
+  num_dims: 3
 
 view:
   classes:

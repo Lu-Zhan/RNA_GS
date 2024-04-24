@@ -54,7 +54,7 @@ def main():
 
     # model & dataloader
     train_dataset = RNADataset3DRand(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=8)
+    train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=8)
 
     val_dataset = RNADataset3DRand(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
