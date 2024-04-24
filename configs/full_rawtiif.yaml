@@ -1,9 +1,9 @@
 exp_name: full_rawtiff
 
 train:
-  lr: 0.005
+  lr: 0.001
   max_epochs: 10
-  num_primarys: 1000
+  num_primarys: 288000
   num_backups: 0
   tile_size: 16
   densification_start: 1000

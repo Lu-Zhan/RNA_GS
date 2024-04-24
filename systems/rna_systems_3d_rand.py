@@ -27,6 +27,7 @@ class GSSystem3DRand(LightningModule):
         os.makedirs(os.path.join(self.save_folder, "recon"), exist_ok=True)
         os.makedirs(os.path.join(self.save_folder, "recon_plane"), exist_ok=True)
         os.makedirs(os.path.join(self.save_folder, 'classes'), exist_ok=True)
+        os.makedirs(os.path.join(self.save_folder, 'view_3d'), exist_ok=True)
 
         self.mdp_image = None
         self.is_init_rgb = False
@@ -221,7 +222,7 @@ class GSSystem3DRand(LightningModule):
         # visualization
         recon_images = view_recon(pred=mdp_output, gt=mdp_batch)[0]
         recon_images = Image.fromarray(recon_images)
-        recon_images.save(os.path.join(self.save_folder, "recon", f"epoch_{self.global_step:05d}.png"))
+        recon_images.save(os.path.join(self.save_folder, "recon", f"iter_{self.global_step:05d}.png"))
         self.logger.experiment.log({"val_image": [wandb.Image(recon_images, caption="val_image")]}, step=self.global_step)
         
         view_on_image, view_on_image_post, view_on_image_cos, view_on_image_ref, view_classes = self.gs_model.visualize_points(
@@ -248,10 +249,10 @@ class GSSystem3DRand(LightningModule):
         recon_images = [Image.fromarray(view_recon(pred=x, gt=y, vmax=vmax, vmin=vmin)[0]) for x, y in zip(output, batch)]
 
         for i, image in enumerate(recon_images):
-            image.save(os.path.join(self.save_folder, "recon_plane", f"epoch_{self.global_step:05d}_{i}.png"))
+            image.save(os.path.join(self.save_folder, "recon_plane", f"iter_{self.global_step:05d}_{i}.png"))
         
         # 3d visualization
-        self.gs_model.visualize_3d(save_folder=self.save_folder)
+        self.gs_model.visualize_3d(save_path=os.path.join(self.save_folder, "view_3d", f"iter_{self.global_step:05d}_{i}.ply"))
 
         if not is_predict:
             self.logger.experiment.log({

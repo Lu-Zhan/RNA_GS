@@ -330,11 +330,15 @@ class GaussModel(torch.nn.Module):
         view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder)
 
     @torch.no_grad()
-    def visualize_3d(self, save_folder):
+    def visualize_3d(self, save_path):
         means_3d, scales, quats = self.obtain_data()[:3]
         colors = self.colors
         
-        mask = (torch.abs(means_3d[:, 0]) <= 1) & (torch.abs(means_3d[:, 1]) <= 1) & (torch.min(colors, dim=-1)[0] > 0.5) & (torch.min(scales, dim=-1)[0] > 0.01)
+        mask = (torch.abs(means_3d[:, 0]) <= 1) & (torch.abs(means_3d[:, 1]) <= 1) & (torch.min(colors, dim=-1)[0] > 0.2) & (torch.min(scales, dim=-1)[0] > 0.01)
+
+        # sort by color and only draw top 50000 points
+        mask = torch.argsort(colors, descending=True)[0][:50000]
+         
         means_3d = means_3d[mask].data.cpu().numpy()
         scales = scales[mask].data.cpu().numpy()
         quats = quats[mask].data.cpu().numpy()
@@ -345,7 +349,7 @@ class GaussModel(torch.nn.Module):
             scales=scales,
             quats=quats, 
             colors=None, 
-            save_path=os.path.join(save_folder, "view_3d.ply")
+            save_path=save_path,
         )
 
 
