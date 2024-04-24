@@ -62,7 +62,7 @@ class GaussModel(torch.nn.Module):
     def obtain_data(self):
         return (
             self.means_3d[self.persistent_mask],
-            self.scales[self.persistent_mask],
+            torch.nn.functional.softplus(self.scales[self.persistent_mask]),
             self.quats[self.persistent_mask],
             torch.sigmoid(self.rgbs[self.persistent_mask]),
             torch.sigmoid(self.opacities[self.persistent_mask]),
@@ -104,23 +104,26 @@ class GaussModel(torch.nn.Module):
 
         # radii ~ s * 3 * (w / 2) / 8 = s * w * 3 / 16
         # point size (2-5 px), set range (0px, 12px), 128-0.5, 256-0.25, 64 / 128 = 0.5, 64 / 64
-        self.scales = torch.rand(num_points, 3, device=device)
+        # self.scales = torch.rand(num_points, 3, device=device)
+        self.scales = torch.zeros(num_points, 3, device=device) * 0.5
 
-        u = torch.rand(num_points, 1, device=device)
-        v = torch.rand(num_points, 1, device=device)
-        w = torch.rand(num_points, 1, device=device)
+        # u = torch.rand(num_points, 1, device=device)
+        # v = torch.rand(num_points, 1, device=device)
+        # w = torch.rand(num_points, 1, device=device)
 
-        self.quats = torch.cat(
-            [
-                torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
-                torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
-                torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
-                torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
-            ],
-            -1,
-        )
+        # self.quats = torch.cat(
+        #     [
+        #         torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
+        #         torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
+        #         torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
+        #         torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
+        #     ],
+        #     -1,
+        # )
 
-        # self.quats = torch.ones(num_points, 4, device=device)
+        self.quats = torch.zeros(num_points, 4, device=device)
+        self.quats[:, 0] = 1.
+        
         self.opacities = torch.ones((num_points, 1), device=device)
         self.background = torch.zeros(self.camera.num_dims, device=device)
 
@@ -331,7 +334,7 @@ class GaussModel(torch.nn.Module):
         means_3d, scales, quats = self.obtain_data()[:3]
         colors = self.colors
         
-        mask = (torch.abs(means_3d[:, 0]) <= -1) & (torch.abs(means_3d[:, 1]) <= -1) & (torch.min(colors, dim=-1) > 0.05)
+        mask = (torch.abs(means_3d[:, 0]) <= 1) & (torch.abs(means_3d[:, 1]) <= 1) & (torch.min(colors, dim=-1)[0] > 0.5) & (torch.min(scales, dim=-1)[0] > 0.01)
         means_3d = means_3d[mask].data.cpu().numpy()
         scales = scales[mask].data.cpu().numpy()
         quats = quats[mask].data.cpu().numpy()
@@ -350,7 +353,7 @@ class FixGaussModel(GaussModel):
     def obtain_data(self):
         return (
             self.means_3d,
-            self.scales,
+            torch.nn.functional.softplus(self.scales),
             self.quats,
             torch.sigmoid(self.rgbs),
             torch.sigmoid(self.opacities),

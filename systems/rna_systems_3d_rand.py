@@ -219,7 +219,7 @@ class GSSystem3DRand(LightningModule):
             self.log_step('val/mdp_psnr', mdp_psnr, on_step=False, on_epoch=True,)
 
         # visualization
-        recon_images = view_recon(pred=mdp_output, gt=mdp_batch)
+        recon_images = view_recon(pred=mdp_output, gt=mdp_batch)[0]
         recon_images = Image.fromarray(recon_images)
         recon_images.save(os.path.join(self.save_folder, "recon", f"epoch_{self.global_step:05d}.png"))
         self.logger.experiment.log({"val_image": [wandb.Image(recon_images, caption="val_image")]}, step=self.global_step)
@@ -243,7 +243,9 @@ class GSSystem3DRand(LightningModule):
             view_class.save(os.path.join(self.save_folder, 'classes', f"positions_class_{self.hparams['view']['classes'][i]}.png"))
 
         # visualization
-        recon_images = [Image.fromarray(view_recon(pred=x, gt=y)) for x, y in zip(output, batch)]
+        vmax = float(mdp_batch.data.ravel().max())
+        vmin = float(mdp_batch.ravel()[mdp_batch.ravel() > 0].min()) if (mdp_batch.ravel() > 0).sum() > 0 else 0
+        recon_images = [Image.fromarray(view_recon(pred=x, gt=y, vmax=vmax, vmin=vmin)[0]) for x, y in zip(output, batch)]
 
         for i, image in enumerate(recon_images):
             image.save(os.path.join(self.save_folder, "recon_plane", f"epoch_{self.global_step:05d}_{i}.png"))

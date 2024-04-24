@@ -1,7 +1,7 @@
 exp_name: crop64_rawtiff
 
 train:
-  lr: 0.01
+  lr: 0.001
   max_epochs: 10
   num_primarys: 1000
   num_backups: 0
@@ -41,7 +41,8 @@ process:
 data:
   # data_path: ../data/rna_data_0407/IM41236/rawtiff
   # data_path: ../data/rna_data_0407/IM41236/rawtiff/18/1_324
-  data_path: ../data/rna_data_0407/IM41236/rawtiff/36/1_1296
+  # data_path: ../data/rna_data_0407/IM41236/rawtiff/36/1_1296
+  data_path: ../data/rna_data_0407/IM41236/denoised_rawtiff/36/1_1296
   # data_path: ../data/rna_data_0407/IM41236/cir_0.5_new
   # data_path: ../data/IM41340_tiled/1_36
   # codebook_path: ../data/codebook.xlsx

@@ -73,9 +73,9 @@ def main():
         precision="32-true",
         log_every_n_steps=50,
         strategy="auto",
-        check_val_every_n_epoch=1,
+        check_val_every_n_epoch=2,
         enable_model_summary=False,
-        num_sanity_val_steps=0,
+        num_sanity_val_steps=1,
     )
 
     trainer.fit(

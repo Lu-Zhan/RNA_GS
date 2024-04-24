@@ -70,7 +70,7 @@ def view_positions(points_xy, bg_image, alpha=1, s=1, prefix=""):
     return Image.fromarray(data)
 
 
-def view_recon(pred, gt, resize=(192, 192)):
+def view_recon(pred, gt, resize=(192, 192), vmax=None, vmin=None):
     # view pred and gt images in 15 groups.
     # for each group, pred on left, gt on right, pred: [h, w, 15], gt: [h, w, 15], using heatmap
     # resize to 192 x 192
@@ -91,14 +91,14 @@ def view_recon(pred, gt, resize=(192, 192)):
     # plt.subplots_adjust(top=1, bottom=0, left=0, right=1, wspace=0, hspace=0)
     # plt.margins(0, 0)
 
-    try:
-        vmin = gt.ravel()[gt.ravel() > 0].min()
-    except:
-        vmin = 0
-
-    vmax = gt.ravel().max()
-    # vmax = max(pred.max(), gt.max())
-    # vmin, vmax = 0, 1
+    if vmax is None:
+        vmax = gt.ravel().max()
+    
+    if vmin is None:
+        try:
+            vmin = gt.ravel()[gt.ravel() > 0].min()
+        except:
+            vmin = 0
 
     for i in range(n_rows // 2):
         for j in range(n_cols):
@@ -123,7 +123,7 @@ def view_recon(pred, gt, resize=(192, 192)):
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
     plt.close()
 
-    return data
+    return data, (vmin, vmax)
 
 
 def view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder):

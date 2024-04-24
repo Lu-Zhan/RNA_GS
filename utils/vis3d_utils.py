@@ -29,7 +29,7 @@ def view_3d(means_3d, scales, quats, save_path, colors=None):
 
     for i in range(len(means_3d)):
         ps_info.append({
-            'scales': scales[i].tolist(),
+            'scales': (scales[i] / 8).tolist(),
             'color': colors[i].tolist(),
             'position': means_3d[i].tolist(),
             'quat': quats[i].tolist(),
