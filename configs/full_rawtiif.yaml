@@ -1,7 +1,7 @@
 exp_name: full_rawtiff
 
 train:
-  lr: 0.001
+  lr: 0.002
   max_epochs: 10
   num_primarys: 288000
   num_backups: 0
@@ -39,9 +39,9 @@ process:
   bg_filter_th: -1
 
 data:
-  # data_path: ../data/rna_data_0407/IM41236/rawtiff
+  data_path: ../data/rna_data_0407/IM41236/rawtiff
   # data_path: ../data/rna_data_0407/IM41236/rawtiff/18/1_324
-  data_path: ../data/rna_data_0407/IM41236/rawtiff/36/1_1296
+  # data_path: ../data/rna_data_0407/IM41236/rawtiff/36/1_1296
   # data_path: ../data/rna_data_0407/IM41236/cir_0.5_new
   # data_path: ../data/IM41340_tiled/1_36
   # codebook_path: ../data/codebook.xlsx
