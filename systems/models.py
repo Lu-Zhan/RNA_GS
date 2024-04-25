@@ -3,12 +3,11 @@ import math
 import torch
 import numpy as np
 
-from gsplat.project_gaussians import project_gaussians
-from gsplat.rasterize import rasterize_gaussians
-
 from utils.utils import obtain_init_color, filter_by_background, write_to_csv
 from utils.vis2d_utils import view_positions, view_score_dist
+from utils.vis3d_utils import view_3d
 from systems.losses import obtain_simi
+from systems.render import render_single_slice, render_multi_slices, render_image
 
 
 class GaussModel(torch.nn.Module):
@@ -26,99 +25,30 @@ class GaussModel(torch.nn.Module):
 
         means_3d, scales, quats, rgbs, opacities = self.obtain_data()
 
-        # legacy code
-        try:
-            self.B_SIZE += 0
-        except:
-            self.B_SIZE = 16
-
-        xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
-            means3d=means_3d,
-            scales=scales,
-            glob_scale=1,
-            quats=quats,
-            viewmat=camera.viewmat,
-            projmat=camera.viewmat,
-            fx=camera.focal, fy=camera.focal, cx=camera.W / 2, cy=camera.H / 2,
-            img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
+        return render_image(
+            means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
+            background=self.background, camera=camera, B_SIZE=self.B_SIZE,
         )
-
-        out_img = rasterize_gaussians(
-            xys=xys, 
-            depths=depths,
-            radii=radii,
-            conics=conics,
-            num_tiles_hit=num_tiles_hit,
-            colors=rgbs,
-            opacity=opacities,
-            img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE, background=self.background,
-        )
-
-        return out_img, conics, radii, xys
     
-    def render_slices(self, camera=None):
+    def render_slice(self, camera=None, index=None):
         if camera is None:
             camera = self.camera
 
         means_3d, scales, quats, rgbs, opacities = self.obtain_data()
 
-        xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
-            means3d=means_3d,
-            scales=scales,
-            glob_scale=1,
-            quats=quats,
-            viewmat=camera.viewmat,
-            projmat=camera.viewmat,
-            fx=camera.focal, fy=camera.focal, cx=camera.W / 2, cy=camera.H / 2,
-            img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE,
-        )
-
-        W = cov3d[..., -1:]   # (n, 1)
-        lam = 1 / (W + 1e-8)    # (n, 1)
-        
-        delta_z = camera.plane_zs[None, :] - means_3d[:, -1:]   # (n, k)
-        scale_term = torch.exp(-0.5 * lam * delta_z ** 2)   # (n, k)
-
-        U = torch.stack([cov3d[..., 0], cov3d[..., 1], cov3d[..., 3]], dim=-1)  # (n, 3)
-        V = torch.stack([cov3d[..., 2], cov3d[..., 4]], dim=-1) # (n, 2)
-        VV_t = torch.sum(V ** 2, dim=-1, keepdim=True)  # (n,)
-
-        # (n, 3) - (n, 1) / (n, 1) -> (n, 3)
-        cov2d = U - VV_t / (W + 1e-8)  # (n, 3)
-        lam_cov2d = cov2d / (W + 1e-8)  # (n, 3)
-
-        lam_cov2d = torch.stack([lam_cov2d[..., 0], lam_cov2d[..., 1], lam_cov2d[..., 1], lam_cov2d[..., 2]], dim=-1)  # (n, 4)
-        lam_cov2d = lam_cov2d.reshape(-1, 2, 2)  # (n, 2, 2)
-        inv_lam_cov2d = torch.inverse(lam_cov2d)  # (n, 2, 2)
-        new_conics = torch.stack([inv_lam_cov2d[..., 0, 0], inv_lam_cov2d[..., 0, 1], inv_lam_cov2d[..., 1, 1]], dim=-1)  # (n, 3)
-
-        # (n, 2, 1) + (n, 1, k) * (n, 2, 1) / (n, 1, 1) -> (n, 2, k)
-        xys_z = xys[..., None] + delta_z[:, None, :] * V[..., None] / (W[..., None] + 1e-8)  # (n, 2, k)
-
-        # (n, 1, k)
-        # new_opacities = opacities[..., None] * scale_term[:, None, :]
-
-        # change cov2d to maintain the same scale of gaussian
-        new_conics = new_conics / scale_term
-
-        out_imgs = []
-        for k in range(xys_z.shape[-1]):
-            out_img = rasterize_gaussians(
-                xys=xys_z[..., k], 
-                depths=depths,
-                radii=radii,
-                conics=new_conics,
-                num_tiles_hit=num_tiles_hit,
-                colors=rgbs,
-                opacity=opacities,
-                img_height=camera.H, img_width=camera.W, block_width=self.B_SIZE, background=self.background,
+        if len(index) > 1:
+            return render_multi_slices(
+                means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
+                background=self.background, camera=camera, B_SIZE=self.B_SIZE, index=index,
             )
-
-            out_imgs.append(out_img)
+        elif len(index) == 1:
+            return render_single_slice(
+                means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
+                background=self.background, camera=camera, B_SIZE=self.B_SIZE, index=index,
+            )
+        else:
+            raise ValueError("Plane index should be at least one element.")
         
-        out_imgs = torch.stack(out_imgs, dim=0) # (k, h, w, 15)
-        return out_imgs, new_conics, radii, xys
-    
     @property
     def parameters(self):
         return (
@@ -132,7 +62,7 @@ class GaussModel(torch.nn.Module):
     def obtain_data(self):
         return (
             self.means_3d[self.persistent_mask],
-            self.scales[self.persistent_mask],
+            torch.nn.functional.softplus(self.scales[self.persistent_mask]),
             self.quats[self.persistent_mask],
             torch.sigmoid(self.rgbs[self.persistent_mask]),
             torch.sigmoid(self.opacities[self.persistent_mask]),
@@ -170,47 +100,39 @@ class GaussModel(torch.nn.Module):
     def _init_gaussians(self, num_primarys, num_backups, device):
         num_points = num_primarys + num_backups
 
-        # self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # change to x y
+        self.means_3d = 2 * (torch.rand(num_points, 3, device=device) - 0.5)    # [-1, 1]
 
-        self.means_3d = torch.zeros(num_points, 3, device=device)
+        # radii ~ s * 3 * (w / 2) / 8 = s * w * 3 / 16
+        # point size (2-5 px), set range (0px, 12px), 128-0.5, 256-0.25, 64 / 128 = 0.5, 64 / 64
+        # self.scales = torch.rand(num_points, 3, device=device)
+        self.scales = torch.zeros(num_points, 3, device=device) * 0.5
 
-        self.scales = torch.rand(num_points, 3, device=device) * 0.5
+        # u = torch.rand(num_points, 1, device=device)
+        # v = torch.rand(num_points, 1, device=device)
+        # w = torch.rand(num_points, 1, device=device)
 
-        u = torch.rand(num_points, 1, device=device)
-        v = torch.rand(num_points, 1, device=device)
-        w = torch.rand(num_points, 1, device=device)
-
-        self.quats = torch.cat(
-            [
-                torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
-                torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
-                torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
-                torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
-            ],
-            -1,
-        )
-        self.opacities = torch.ones((num_points, 1), device=device)
-
-        # self.viewmat = torch.tensor(
+        # self.quats = torch.cat(
         #     [
-        #         [1.0, 0.0, 0.0, 0.0],
-        #         [0.0, 1.0, 0.0, 0.0],
-        #         [0.0, 0.0, 1.0, 8.0],
-        #         [0.0, 0.0, 0.0, 1.0],
+        #         torch.sqrt(1.0 - u) * torch.sin(2.0 * math.pi * v),
+        #         torch.sqrt(1.0 - u) * torch.cos(2.0 * math.pi * v),
+        #         torch.sqrt(u) * torch.sin(2.0 * math.pi * w),
+        #         torch.sqrt(u) * torch.cos(2.0 * math.pi * w),
         #     ],
-        #     device=device,
+        #     -1,
         # )
+
+        self.quats = torch.zeros(num_points, 4, device=device)
+        self.quats[:, 0] = 1.
         
+        self.opacities = torch.ones((num_points, 1), device=device)
         self.background = torch.zeros(self.camera.num_dims, device=device)
 
         self.means_3d.requires_grad = True
         self.scales.requires_grad = True
         self.quats.requires_grad = True
         self.opacities.requires_grad = True
-        # self.viewmat.requires_grad = False
 
-        # self.rgbs = torch.rand(num_points, 15, device=device)
-        self.rgbs = torch.randn(num_points, self.camera.num_dims, device=device) / 0.4
+        self.rgbs = torch.randn(num_points, self.camera.num_dims, device=device)
         self.rgbs.requires_grad = True
 
     def _init_mask(self, num_primarys, num_backups):
@@ -407,12 +329,35 @@ class GaussModel(torch.nn.Module):
         # selected_classes=self.hparams['view']['classes']
         view_score_dist(selected_classes, pred_class_name, ref_score, rna_class, rna_name, save_folder)
 
+    @torch.no_grad()
+    def visualize_3d(self, save_path):
+        means_3d, scales, quats = self.obtain_data()[:3]
+        colors = self.colors
+        
+        mask = (torch.abs(means_3d[:, 0]) <= 1) & (torch.abs(means_3d[:, 1]) <= 1) & (torch.min(colors, dim=-1)[0] > 0.2) & (torch.min(scales, dim=-1)[0] > 0.01)
+
+        # sort by color and only draw top 50000 points
+        mask = torch.argsort(colors, descending=True)[0][:50000]
+         
+        means_3d = means_3d[mask].data.cpu().numpy()
+        scales = scales[mask].data.cpu().numpy()
+        quats = quats[mask].data.cpu().numpy()
+        # colors = colors[mask].data.cpu().numpy()
+
+        view_3d(
+            means_3d=means_3d, 
+            scales=scales,
+            quats=quats, 
+            colors=None, 
+            save_path=save_path,
+        )
+
 
 class FixGaussModel(GaussModel):
     def obtain_data(self):
         return (
             self.means_3d,
-            self.scales,
+            torch.nn.functional.softplus(self.scales),
             self.quats,
             torch.sigmoid(self.rgbs),
             torch.sigmoid(self.opacities),

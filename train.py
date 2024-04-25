@@ -4,7 +4,6 @@ import torch
 import logging
 logging.getLogger('lightning').setLevel(0)
 
-from pathlib import Path
 from argparse import ArgumentParser, REMAINDER
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import WandbLogger
@@ -12,17 +11,16 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
 from systems import GSSystem3D
-from datasets import RNADataset
+from datasets import RNADataset3DRand
 
 torch.set_float32_matmul_precision('medium')
-
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])
-    parser.add_argument("--config", type=str, default='configs/default.yaml')
+    parser.add_argument("--config", type=str, default='configs/crop64_rawtiff.yaml')
     parser.add_argument("--exp_name", type=str, default='')
-    parser.add_argument("--exp_dir", type=str, default='outputs/')
+    parser.add_argument("--exp_dir", type=str, default='outputs_3d_rand/')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
     
@@ -38,6 +36,7 @@ def main():
         project='rna_cali_0320',
         save_dir=config['exp_dir'],
     )
+
     ckpt_path = os.path.join(logger.save_dir, logger.experiment.id, 'checkpoints')
     os.makedirs(ckpt_path, exist_ok=True)
     config['exp_dir'] = os.path.dirname(ckpt_path)
@@ -54,10 +53,10 @@ def main():
     )
 
     # model & dataloader
-    train_dataset = RNADataset(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=8)
+    train_dataset = RNADataset3DRand(hparams=config, mode='train')
+    train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
 
-    val_dataset = RNADataset(hparams=config, mode='val')
+    val_dataset = RNADataset3DRand(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 
     config['hw'] = train_dataset.size[:2]
@@ -70,12 +69,11 @@ def main():
         callbacks=[checkpoint_callback],
         devices=config['devices'],
         accelerator="gpu",
-        max_epochs=-1,
-        max_steps=config['train']['iterations'],
+        max_epochs=config['train']['max_epochs'],
         precision="32-true",
         log_every_n_steps=50,
         strategy="auto",
-        val_check_interval=2000,
+        check_val_every_n_epoch=2,
         enable_model_summary=False,
         num_sanity_val_steps=1,
     )

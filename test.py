@@ -7,7 +7,7 @@ from lightning.pytorch import Trainer, seed_everything
 from torch.utils.data import DataLoader
 
 from systems import GSSystem3D
-from train import RNADataset
+from archive.train import RNADataset
 
 torch.set_float32_matmul_precision('medium')
     
