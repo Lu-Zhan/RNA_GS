@@ -8,9 +8,11 @@
             "name": "debug train",
             "type": "debugpy",
             "request": "launch",
-            "program": "train_3d_rand.py",
+            "program": "train.py",
             "console": "integratedTerminal",
             "args": [
+                "--config",
+                "configs/crop128_5r.yaml",
                 "exp_name",
                 "debug_3d",
             ]

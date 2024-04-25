@@ -11,7 +11,7 @@ from systems.losses import *
 from utils.vis2d_utils import view_recon
 from utils.utils import read_codebook
 from systems.models import model_zoo
-from systems.cameras import SliceCamera
+from systems.cameras import SliceCameras
 
 
 class GSSystem3D(LightningModule):
@@ -30,13 +30,14 @@ class GSSystem3D(LightningModule):
         self.mdp_image = None
         self.is_init_rgb = False
 
-        self.cam_model = SliceCamera(
-            num_slice=self.hparams['model']['num_slice'],
+        self.cam_model = SliceCameras(
+            num_cams=len(hparams['camera']['cam_ids']),
+            num_slices=hparams['camera']['num_slices'],
+            num_dims=self.hparams['model']['num_dims'],
             hw=self.hparams['hw'],
             step_z=self.hparams['model']['step_z'],
             camera_z=self.hparams['model']['camera_z'],
             refine_camera=self.hparams['train']['refine_camera'],
-            num_dims=self.hparams['model']['num_dims'],
             device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
         )
 
@@ -52,11 +53,9 @@ class GSSystem3D(LightningModule):
             self.rna_class, self.rna_name = read_codebook(path=self.hparams['data']['codebook_path'], bg=False)
             self.mi_rna_class, self.mi_rna_name = read_codebook(path=self.hparams['data']['codebook_path'], bg=True)
         else:
-            # self.rna_class, self.rna_name = np.array([[1., 1., 1.]]), np.array(['full'])
-            # self.mi_rna_class, self.mi_rna_name = np.array([[1., 1., 1.], [0., 0., 0.]]), np.array(['full', 'background'])
-
-            self.rna_class, self.rna_name = np.array([[1.]]), np.array(['full'])
-            self.mi_rna_class, self.mi_rna_name = np.array([[1.], [0.]]), np.array(['full', 'background'])
+            num_dims = self.hparams['model']['num_dims']
+            self.rna_class, self.rna_name = np.array([[1.] * num_dims]), np.array(['full'])
+            self.mi_rna_class, self.mi_rna_name = np.array([[1.] * num_dims, [0.] * num_dims]), np.array(['full', 'background'])
 
         self.rna_class = torch.tensor(self.rna_class, device=self.gs_model.means_3d.device, dtype=self.gs_model.means_3d.dtype)
         self.mi_rna_class = torch.tensor(self.mi_rna_class, device=self.gs_model.means_3d.device, dtype=self.gs_model.means_3d.dtype)
@@ -73,16 +72,20 @@ class GSSystem3D(LightningModule):
         # self.automatic_optimization = False
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.gs_model.parameters, lr=self.hparams['train']['lr'])
-        return optimizer
+        gs_optimizer = optim.Adam(self.gs_model.parameters, lr=self.hparams['train']['lr'])
+
+        if self.hparams['train']['refine_camera']:
+            cam_optimizer = optim.Adam(self.cam_model.parameters, lr=self.hparams['train']['lr_cam'])
+            return [gs_optimizer, cam_optimizer]
+        else:
+            return [gs_optimizer]
 
     def training_step(self, batch, batch_idx):
-        # batch = batch[0]
-        batch, index = batch
+        batch, cam_idxs, slice_idxs = batch
 
         if self.is_init_rgb is False and self.hparams['train']['init_rgb']:
             with torch.no_grad():
-                _, _, _, xys = self.gs_model.render(camera=self.cam_model)
+                xys = self.gs_model.obtain_xys(camera=self.cam_model)
                 self.gs_model.init_rgbs(xys=xys, gt_images=batch.max(dim=0)[0])
             self.is_init_rgb = True
 
@@ -96,7 +99,9 @@ class GSSystem3D(LightningModule):
             if self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
                 self.prune_points()
 
-        output, conics, radii, _ = self.gs_model.render_slice(camera=self.cam_model, index=index)
+        output, cov2d, radii, _ = self.gs_model.render_slice(
+            camera=self.cam_model, cam_idxs=cam_idxs, slice_idxs=slice_idxs,
+        )
 
         # output = mdp_slices.max(dim=0)[0]   # (n, h, w, k) -> (h, w, k)
         mdp_output = output.max(dim=-1)[0]  #.max(dim=0)[0]   # (n, h, w, k) -> (h, w)
@@ -133,15 +138,15 @@ class GSSystem3D(LightningModule):
             loss += self.hparams['loss']['w_bg_l1'] * loss_bg_l1
             self.log_step("train/loss_bg_l1", loss_bg_l1)
 
-        # if self.hparams['loss']['w_rho'] > 0:
-        #     loss_rho = rho_loss(conics)
-        #     loss += self.hparams['loss']['w_rho'] * loss_rho
-        #     self.log_step("train/loss_rho", loss_rho)
+        if self.hparams['loss']['w_rho'] > 0:
+            loss_rho = rho_loss(cov2d)
+            loss += self.hparams['loss']['w_rho'] * loss_rho
+            self.log_step("train/loss_rho", loss_rho)
         
-        # if self.hparams['loss']['w_radius'] > 0:
-        #     loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
-        #     loss += self.hparams['loss']['w_radius'] * loss_radius
-        #     self.log_step("train/loss_radius", loss_radius)
+        if self.hparams['loss']['w_radius'] > 0:
+            loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
+            loss += self.hparams['loss']['w_radius'] * loss_radius
+            self.log_step("train/loss_radius", loss_radius)
             
         # losses for map image
         if self.hparams['loss']['w_mdp_l2'] > 0:
@@ -191,25 +196,29 @@ class GSSystem3D(LightningModule):
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
         self.log_step("params/num_samples", self.gs_model.current_num_samples)
+        self.logger.experiment.log({
+            f"cam_zs/{i}": self.cam_model.camera_zs[i] for i in self.hparams['camera']['cam_ids']
+        })
 
         return loss
     
-    def obtain_output(self, index):
-        output, _, _, xys = self.gs_model.render_slice(camera=self.cam_model, index=index)
+    def obtain_output(self, cam_idxs, slice_idxs):
+        output, _, _, xys = self.gs_model.render_slice(
+            camera=self.cam_model, cam_idxs=cam_idxs, slice_idxs=slice_idxs,
+        )
 
         return output, xys
 
-    def forward_evaluation(self, output, batch, xys, is_predict=False, log_each_plane=False):
-
+    def forward_evaluation(self, output, input, xys, is_predict=False, log_each_plane=False):
         output = self._original(output)
-        batch = self._original(batch)
+        input = self._original(input)
 
         # metric
-        mean_mse = torch.mean((output - batch) ** 2).cpu()
+        mean_mse = torch.mean((output - input) ** 2).cpu()
         mean_psnr = float(10 * torch.log10(1 / mean_mse))
 
         mdp_output = output.max(dim=0)[0]
-        mdp_batch = batch.max(dim=0)[0]
+        mdp_batch = input.max(dim=0)[0]
 
         mdp_psnr = calculate_mdp_psnr(mdp_output, mdp_batch)
 
@@ -244,13 +253,13 @@ class GSSystem3D(LightningModule):
         # visualization
         vmax = float(mdp_batch.data.ravel().max())
         vmin = float(mdp_batch.ravel()[mdp_batch.ravel() > 0].min()) if (mdp_batch.ravel() > 0).sum() > 0 else 0
-        recon_images = [Image.fromarray(view_recon(pred=x, gt=y, vmax=vmax, vmin=vmin)[0]) for x, y in zip(output, batch)]
+        recon_images = [Image.fromarray(view_recon(pred=x, gt=y, vmax=vmax, vmin=vmin)[0]) for x, y in zip(output, input)]
 
         for i, image in enumerate(recon_images):
             image.save(os.path.join(self.save_folder, "recon_plane", f"iter_{self.global_step:05d}_{i}.png"))
         
         # 3d visualization
-        self.gs_model.visualize_3d(save_path=os.path.join(self.save_folder, "view_3d", f"iter_{self.global_step:05d}_{i}.ply"))
+        self.gs_model.visualize_3d(save_path=os.path.join(self.save_folder, "view_3d", f"iter_{self.global_step:05d}.ply"))
 
         if not is_predict:
             self.logger.experiment.log({
@@ -322,8 +331,8 @@ class GSSystem3D(LightningModule):
         self.log(name, loss, on_step=on_step, on_epoch=on_epoch, prog_bar=prog_bar)
 
     def validation_step(self, batch, batch_idx):
-        batch, index = batch
-        self.validation_step_outputs.append((self.obtain_output(index), batch))
+        batch, cam_idxs, slice_idxs = batch
+        self.validation_step_outputs.append((self.obtain_output(cam_idxs, slice_idxs), batch))
     
     def on_validation_epoch_end(self):
         recon = [x[0][0] for x in self.validation_step_outputs]
@@ -338,8 +347,8 @@ class GSSystem3D(LightningModule):
         self.forward_evaluation(recon, gt, xys, is_predict=False, log_each_plane=True)
 
     def predict_step(self, batch, batch_idx):
-        batch, index = batch
-        self.predict_step_outputs.append((self.obtain_output(index), batch))
+        batch, cam_idxs, slice_idxs = batch
+        self.predict_step_outputs.append((self.obtain_output(cam_idxs, slice_idxs), batch))
     
     def on_predict_epoch_end(self):
         recon = [x[0][0] for x in self.predict_step_outputs]

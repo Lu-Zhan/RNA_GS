@@ -11,7 +11,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
 from systems import GSSystem3D
-from datasets import RNADataset3DRand
+from datasets import RNADataset3D
 
 torch.set_float32_matmul_precision('medium')
 
@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--devices", nargs='+', default=[0])
     parser.add_argument("--config", type=str, default='configs/crop64_rawtiff.yaml')
     parser.add_argument("--exp_name", type=str, default='')
-    parser.add_argument("--exp_dir", type=str, default='outputs_3d_rand/')
+    parser.add_argument("--exp_dir", type=str, default='outputs_xyz/')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
     
@@ -53,14 +53,17 @@ def main():
     )
 
     # model & dataloader
-    train_dataset = RNADataset3DRand(hparams=config, mode='train')
+    train_dataset = RNADataset3D(hparams=config, mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
 
-    val_dataset = RNADataset3DRand(hparams=config, mode='val')
+    val_dataset = RNADataset3D(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range
+    config['camera']['cam_indexs'] = train_dataset.cam_indexs
+    config['camera']['slice_indexs'] = train_dataset.slice_indexs
+    config['camera']['num_slices'] = train_dataset.num_slices
     gs_system = GSSystem3D(hparams=config, dapi_images=train_dataset.dapi_images)
 
     trainer = Trainer(

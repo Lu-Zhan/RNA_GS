@@ -1,138 +1,78 @@
+import os
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
-import torchvision.transforms as transforms
 
-from PIL import Image
 from pathlib import Path
 from torch.utils.data import Dataset
 
-class RNADataset(Dataset):
+from datasets.read_images import read_images_single_round, read_images_multi_round, read_dapi_image_outside
+
+
+class RNADataset3D(Dataset):
+    def __init__(self, hparams, mode='train'):
+        self.color_bias = hparams['train']['color_bias']
+        self.data_dir = hparams['data']['data_path']
+        self.num_cams = len(hparams['camera']['cam_ids'])
+        self.num_dims = hparams['model']['num_dims']
+
+        # [(k, h, w, c)], (vmax, vmin)
+        self.gt_images, self.cam_indexs, self.slice_indexs, self.range = read_images_multi_round(image_folder=self.data_dir)
+        self.dapi_images = read_dapi_image_outside(image_folder=os.path.join(self.data_dir, 'dapi_image')) # (m, h, w, 1)
+        # self.dapi_images = torch.relu(self.dapi_images - self.range[0]) / (self.range[1] - self.range[0])
+
+        self.gt_images = self.gt_images[..., :hparams['model']['num_dims']] * (1 - self.color_bias * 2) + self.color_bias 
+        self.mode = mode
+
+        # select cameras
+        self.select_camera(cam_ids=hparams['camera']['cam_ids'])
+        # num_slices = [n0, n1, n2, ...]
+        self.num_slices = [self.cam_indexs.count(idx) for idx in hparams['camera']['cam_ids']]
+
+    def __len__(self):
+        if self.mode == 'train':
+            return 6000 * self.num_cams * self.num_dims
+        else:
+            return self.gt_images.shape[0]
+        
+    def __getitem__(self, index):
+        index = index % self.gt_images.shape[0]
+        return self.gt_images[index], self.cam_indexs[index], self.slice_indexs[index]    # (h, w, c)
+
+    @property
+    def size(self):
+        return self.gt_images.shape[1:]
+    
+    def select_camera(self, cam_ids):
+        selected_index = [i for i, x in enumerate(self.cam_indexs) if x in cam_ids]
+        self.gt_images = self.gt_images[selected_index]
+        self.cam_indexs = [self.cam_indexs[i] for i in selected_index]
+        self.slice_indexs = [self.slice_indexs[i] for i in selected_index]
+    
+
+class RNADataset3DSingleRound(Dataset):
     def __init__(self, hparams, mode='train'):  
         path = Path(hparams['data']['data_path'])
 
-        self.gt_images, self.range = images_to_tensor(path)
-        self.dapi_images = read_dapi_image(path)
+        self.gt_images, self.range = read_images_single_round(path)
+
+        self.dapi_images =self.gt_images[..., :1]   # (n, h, w, 1)
+        self.gt_images = self.gt_images[..., 1:1+hparams['model']['num_dims']]    # (n, h, w, c)
 
         self.color_bias = hparams['train']['color_bias']
 
         self.gt_images = self.gt_images * (1 - self.color_bias * 2) + self.color_bias
 
-        self.num_iters = hparams['train']['iterations']
         self.mode = mode
         
     def __len__(self):
         if self.mode == 'train':
-            return self.num_iters
+            return 100000
         else:
-            return 1
-
+            return self.gt_images.shape[0]
+        
     def __getitem__(self, index):
-        return self.gt_images
+        index = index % self.gt_images.shape[0]
+        return self.gt_images[index], index    # (h, w, c)
 
     @property
     def size(self):
-        return self.gt_images.shape
-
-
-def images_to_tensor(image_path: Path):
-    image_paths = [image_path / f'F1R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
-
-    images = []
-    transform = transforms.ToTensor()
-
-    for image_path in image_paths:
-        img = Image.open(image_path)
-        img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
-        images.append(img_tensor)
-
-    imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
-    imgs_tensor = torch.log10(imgs_tensor + 1)
-
-    min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
-    imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
-
-    return imgs_tensor ** 0.5, (min_value, max_value)
-
-
-def read_dapi_image(image_path: Path):
-    image_paths = [image_path / f'F1R{r}Ch1.png' for r in range(1, 6)]
-
-    images = []
-    transform = transforms.ToTensor()
-
-    for image_path in image_paths:
-        img = Image.open(image_path)
-        img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
-        images.append(img_tensor)
-
-    imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
-    imgs_tensor = torch.log10(imgs_tensor + 1) # / torch.log10(torch.tensor([2801])) # [h,w,15]
-    # imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
-
-    min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
-    imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
-
-    return imgs_tensor
-
-
-# draw histogram of the image, image: [h, w]
-def draw_histogram(image, name):
-    # remove zero values, 100 bins, title is the percentage of the non-zero values
-    pos_image = image[image > 0]
-    # plt.hist(pos_image.ravel(), 1000, [0, 1])
-    plt.hist(image.ravel(), 100, [0, 3])
-    plt.title(f'P: {(pos_image.ravel().shape[0] / image.ravel().shape[0]) * 100:.2f}% mean: {pos_image.mean():.2f} std: {pos_image.std():.2f}' + \
-              f' O: mean: {image.mean():.2f} std: {image.std():.2f}')
-
-    plt.savefig(name)
-
-
-class RNARawDataset(Dataset):
-    def __init__(self, hparams, mode='train'):  
-        path = Path(hparams['data']['data_path'])
-
-        self.gt_images, self.range = read_raw_image(path)
-
-        self.num_iters = hparams['train']['iterations']
-        self.mode = mode
-
-
-def read_raw_image(image_path: Path):
-    image_paths = [image_path / f'F2R{r}Ch{c}.png' for r in range(1, 6) for c in range(2, 5)]
-
-    images = []
-    transform = transforms.ToTensor()
-
-    for image_path in image_paths:
-        img = Image.open(image_path)
-        img_tensor = transform(img).permute(1, 2, 0)[..., :3] #[h,w,1]
-        images.append(img_tensor)
-
-    imgs_tensor = torch.cat(images, dim=2) / 1.0 # [h, w, 15]
-    imgs_tensor = torch.log10(imgs_tensor + 1)
-    
-    # / torch.log10(torch.tensor([2000])) # [h,w,15]
-
-    # imgs_tensor = torch.clamp(imgs_tensor, 0, 1)
-    # imgs_tensor = torch.cat(images, dim=2) / 255. # [h, w, 15]
-
-    # min_value, max_value = imgs_tensor.min(), imgs_tensor.max()
-    # imgs_tensor = (imgs_tensor - min_value) / (max_value - min_value)
-
-    return imgs_tensor ** 0.5, (0, 65536)
-
-
-if __name__ == "__main__":
-    val_dataset = RNARawDataset(
-        hparams={
-            'data': {'data_path': '/home/luzhan/Projects/rna/data/IM41340_full/IM41340_raw'}, 
-            'train': {'iterations': 1},
-        }, 
-        mode='val',
-    )
-
-    image_idx = 0
-    print(val_dataset.gt_images[..., image_idx].numpy().mean())
-
-    draw_histogram(val_dataset.gt_images[..., image_idx].numpy(), name=f'histogram_{image_idx}.png')
+        return self.gt_images.shape[1:]

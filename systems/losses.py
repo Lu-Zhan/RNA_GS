@@ -70,17 +70,14 @@ def bg_mse_loss(input, target, th=0.05):
     return ((input * mask) ** 2).sum() / (mask.sum() + 1e-8)
 
 
-def rho_loss(conics):
-    inv_cov = torch.stack([conics[:, 0], conics[:, 1], conics[:, 1], conics[:, 2]], dim=1)    # (N, 4)
-    inv_cov = inv_cov.view(-1, 2, 2)    # (N, 2, 2)
-
-    cov = torch.inverse(inv_cov)    # (N, 2, 2)
-    rho_2 = (cov[:, 0, 1] * cov[:, 1, 0]) / (cov[:, 0, 0] * cov[:, 1, 1])
+def rho_loss(cov2d):
+     # cov2d, (n, 3)
+    rho_2 = cov2d[:, 1] ** 2 / (cov2d[:, 0] * cov2d[:, 2] + 1e-8)   
 
     return rho_2.mean()
 
 
-def radius_loss(radii, range=[2, 4]):
+def radius_loss(radii, range=[2, 7]):
     # loss_small = (torch.relu(range[0] - radii) ** 2).mean()
     loss_big = (torch.relu(radii - range[0]) ** 2).mean()
 

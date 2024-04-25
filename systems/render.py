@@ -3,12 +3,12 @@ import torch
 from gsplat.project_gaussians import project_gaussians
 from gsplat.rasterize import rasterize_gaussians
 
-from utils.gaussian_utils import slice_3d_gaussians_by_single_z, slice_3d_gaussians_by_multi_z
+from utils.gaussian_utils import slice_3d_gaussians_by_single_z, slice_3d_gaussians_by_multi_z, project_pix
 
 
 def render_single_slice(
-        means_3d, scales, quats, rgbs, opacities, background, 
-        camera, B_SIZE, index,
+        means_3d, scales, quats, rgbs, opacities, background, B_SIZE,
+        viewmat, focal, plane_zs, hw,
     ):
 
     cov3d, cov2d, xys, depths, radii, conics, num_tiles_hit, mask, scale_term = slice_3d_gaussians_by_single_z(
@@ -16,11 +16,11 @@ def render_single_slice(
         scales=scales,
         glob_scale=1,
         quats=quats,
-        viewmat=camera.viewmat,
-        fullmat=camera.viewmat,
-        intrins=(camera.focal, camera.focal, camera.W / 2, camera.H / 2),
-        plane_z=camera.plane_zs[index],
-        img_size=(camera.W, camera.H),
+        viewmat=viewmat,
+        fullmat=viewmat,
+        intrins=(focal, focal, hw[1] / 2, hw[0] / 2),
+        plane_z=plane_zs,
+        img_size=(hw[0], hw[1]),
         block_width=B_SIZE,
     )
 
@@ -34,31 +34,30 @@ def render_single_slice(
         num_tiles_hit=num_tiles_hit,
         colors=new_rgbs,
         opacity=opacities,
-        img_height=camera.H, img_width=camera.W, block_width=B_SIZE, background=background,
+        img_height=hw[0], img_width=hw[1], block_width=B_SIZE, background=background,
     )
 
-    # return out_imgs, conics, radii, xys
-    return out_img[None, ...], conics, radii, xys
+    # (1, h, w, c), (n, 3), (n,), (n, 2)
+    return out_img[None, ...], cov2d, radii, xys
 
 
 def render_multi_slices(
-        means_3d, scales, quats, rgbs, opacities, background, 
-        camera, B_SIZE, index,
+        means_3d, scales, quats, rgbs, opacities, background, B_SIZE,
+        viewmat, focal, plane_zs, hw,
     ):
 
     # index: (k,)
-
     # 
     cov3d, cov2d, xys, depths, radii, conics, num_tiles_hit, mask, scale_term = slice_3d_gaussians_by_multi_z(
         means3d=means_3d,
         scales=scales,
         glob_scale=1,
         quats=quats,
-        viewmat=camera.viewmat,
-        fullmat=camera.viewmat,
-        intrins=(camera.focal, camera.focal, camera.W / 2, camera.H / 2),
-        plane_z=camera.plane_zs[index],
-        img_size=(camera.W, camera.H),
+        viewmat=viewmat,
+        fullmat=viewmat,
+        intrins=(focal, focal, hw[1] / 2, hw[0] / 2),
+        plane_z=plane_zs,
+        img_size=(hw[0], hw[1]),
         block_width=B_SIZE,
     )
 
@@ -74,43 +73,22 @@ def render_multi_slices(
             num_tiles_hit=num_tiles_hit[..., k],
             colors=new_rgbs[..., k],
             opacity=opacities,
-            img_height=camera.H, img_width=camera.W, block_width=B_SIZE, background=background,
+            img_height=hw[0], img_width=hw[1], block_width=B_SIZE, background=background,
         )
 
         out_imgs.append(out_img)
     
     out_imgs = torch.stack(out_imgs, dim=0)
 
-    # return out_imgs, conics, radii, xys
-    return out_imgs, conics, radii, xys
+    # (k, h, w, c), (n, 3, k), (n, k), (n, 2, k)
+    return out_imgs, cov2d, radii, xys
 
 
-
-def render_image(
-        means_3d, scales, quats, rgbs, opacities, background,
-        camera, B_SIZE
-    ):
-
-    xys, depths, radii, conics, compensation, num_tiles_hit, cov3d = project_gaussians(
-        means3d=means_3d,
-        scales=scales,
-        glob_scale=1,
-        quats=quats,
-        viewmat=camera.viewmat,
-        projmat=camera.viewmat,
-        fx=camera.focal, fy=camera.focal, cx=camera.W / 2, cy=camera.H / 2,
-        img_height=camera.H, img_width=camera.W, block_width=B_SIZE,
+def project_to_xys(means_3d, viewmat, img_size):
+    # xys = project_pix(fullmat, means3d, img_size, (cx, cy)) # (n * k, 2)
+    return project_pix(
+        fullmat=viewmat, 
+        p=means_3d, 
+        img_size=img_size, 
+        center=(img_size[0] / 2, img_size[1] / 2),
     )
-
-    out_img = rasterize_gaussians(
-        xys=xys, 
-        depths=depths,
-        radii=radii,
-        conics=conics,
-        num_tiles_hit=num_tiles_hit,
-        colors=rgbs,
-        opacity=opacities,
-        img_height=camera.H, img_width=camera.W, block_width=B_SIZE, background=background,
-    )
-
-    return out_img, conics, radii, xys

@@ -7,7 +7,7 @@ from utils.utils import obtain_init_color, filter_by_background, write_to_csv
 from utils.vis2d_utils import view_positions, view_score_dist
 from utils.vis3d_utils import view_3d
 from systems.losses import obtain_simi
-from systems.render import render_single_slice, render_multi_slices, render_image
+from systems.render import render_single_slice, render_multi_slices, project_to_xys
 
 
 class GaussModel(torch.nn.Module):
@@ -19,35 +19,42 @@ class GaussModel(torch.nn.Module):
 
         self.B_SIZE = B_SIZE
     
-    def render(self, camera=None):
-        if camera is None:
-            camera = self.camera
-
+    def render_slice(self, camera, cam_idxs, slice_idxs):
         means_3d, scales, quats, rgbs, opacities = self.obtain_data()
 
-        return render_image(
-            means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
-            background=self.background, camera=camera, B_SIZE=self.B_SIZE,
-        )
-    
-    def render_slice(self, camera=None, index=None):
-        if camera is None:
-            camera = self.camera
+        if len(slice_idxs) > 1:
+            outputs_dict = {i: [] for i in range(4)}
+            for cam_idx, slice_idx in zip(cam_idxs, slice_idxs):
+                # (1, h, w, c), (n, 3), (n,), (n, 2), out_imgs, conics, radii, xys
+                outputs = render_single_slice(
+                    means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities, 
+                    background=self.background, B_SIZE=self.B_SIZE,
+                    viewmat=camera.viewmat(cam_idx), 
+                    plane_zs=camera.plane_zs(cam_idx)[slice_idx],
+                    focal=camera.focal, hw=camera.hw, 
+                )
+                for i, x in enumerate(outputs):
+                    outputs_dict[i].append(x) 
 
-        means_3d, scales, quats, rgbs, opacities = self.obtain_data()
-
-        if len(index) > 1:
-            return render_multi_slices(
-                means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
-                background=self.background, camera=camera, B_SIZE=self.B_SIZE, index=index,
-            )
-        elif len(index) == 1:
+            return [torch.cat(outputs_dict[i], dim=0) for i in range(4)]
+            
+        elif len(slice_idxs) == 1:
             return render_single_slice(
-                means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities,
-                background=self.background, camera=camera, B_SIZE=self.B_SIZE, index=index,
+                means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities, 
+                background=self.background, B_SIZE=self.B_SIZE,
+                viewmat=camera.viewmat(cam_idxs), 
+                plane_zs=camera.plane_zs(cam_idxs)[slice_idxs],
+                focal=camera.focal, hw=camera.hw, 
             )
         else:
             raise ValueError("Plane index should be at least one element.")
+    
+    def obtain_xys(self, camera):
+        return project_to_xys(
+            means_3d=self.obtain_data()[0], 
+            viewmat=camera.viewmat(0), 
+            img_size=(camera.hw[1], camera.hw[0]),
+        )
         
     @property
     def parameters(self):
@@ -146,7 +153,7 @@ class GaussModel(torch.nn.Module):
         # color range (color_bias, 1 - color_bias)
         color = obtain_init_color(
             input_xys=xys,
-            hw=[self.camera.H, self.camera.W],
+            hw=self.camera.hw,
             image=gt_images,
         )
 
@@ -157,7 +164,7 @@ class GaussModel(torch.nn.Module):
         processed_colors = filter_by_background(
             xys=xys,
             colors=self.colors,
-            hw=[self.camera.H, self.camera.W],
+            hw=self.camera.hw,
             image=gt_images,
             th=th,
         )
