@@ -2,7 +2,7 @@ exp_name: crop128_5r
 
 train:
   lr: 0.002
-  lr_cam: 0.0001
+  lr_cam: 0.001
   max_epochs: 10
   num_primarys: 1000
   num_backups: 0
@@ -16,6 +16,7 @@ train:
   color_bias: 0.01
   refine_camera: 1
   batch_size: 16
+  refine_camera_start_epoch: 5
 
 loss:
   w_l1: 0

@@ -8,7 +8,7 @@
             "name": "debug train",
             "type": "debugpy",
             "request": "launch",
-            "program": "train.py",
+            "program": "train_percam.py",
             "console": "integratedTerminal",
             "args": [
                 "--config",

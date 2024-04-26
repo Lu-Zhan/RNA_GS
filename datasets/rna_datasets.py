@@ -1,5 +1,6 @@
 import os
 import torch
+import numpy as np
 
 from pathlib import Path
 from torch.utils.data import Dataset
@@ -47,6 +48,41 @@ class RNADataset3D(Dataset):
         self.cam_indexs = [self.cam_indexs[i] for i in selected_index]
         self.slice_indexs = [self.slice_indexs[i] for i in selected_index]
     
+
+class RNADataset3DPerCam(RNADataset3D):
+    def __init__(self, hparams, mode='train'):
+        super(RNADataset3DPerCam, self).__init__(hparams, mode)
+        self.cam_indexs = torch.tensor(self.cam_indexs, dtype=torch.long)
+        self.slice_indexs = torch.tensor(self.slice_indexs, dtype=torch.long)
+        self.batch_size = hparams['train']['batch_size']
+        self.create_cam_dict(cam_ids=hparams['camera']['cam_ids'])
+
+    def create_cam_dict(self, cam_ids):
+        self.cam_dict = {
+            cam_id: self.slice_indexs[self.cam_indexs == cam_id] for cam_id in cam_ids
+        }
+
+    def __len__(self):
+        if self.mode == 'train':
+            return 6000 // self.batch_size * self.num_cams * self.num_dims
+        else:
+            return self.gt_images.shape[0]
+    
+    def __getitem__(self, index):
+        index = index % self.gt_images.shape[0]
+
+        if self.mode == 'train':
+            cam_id = int(self.cam_indexs[index])
+            slices = self.cam_dict[cam_id]  # [0, 1, ..., m-1]
+
+            rand_slice_idx = torch.randint(0, len(slices), (self.batch_size,))
+            rand_idx = self.num_slices[cam_id] - self.num_slices[0] + slices[rand_slice_idx]
+
+            # (b, h, w, c), (b), (b)
+            return self.gt_images[rand_idx], self.cam_indexs[rand_idx], self.slice_indexs[rand_idx]    # (h, w, c)
+        else:
+            return self.gt_images[index], self.cam_indexs[index], self.slice_indexs[index]    # (h, w, c)
+
 
 class RNADataset3DSingleRound(Dataset):
     def __init__(self, hparams, mode='train'):  
