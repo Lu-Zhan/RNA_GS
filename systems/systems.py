@@ -69,7 +69,8 @@ class GSSystem3D(LightningModule):
         self.validation_step_outputs = []
         self.predict_step_outputs = []
 
-        # self.automatic_optimization = False
+        if self.hparams['train']['refine_camera']:
+            self.automatic_optimization = False
 
     def configure_optimizers(self):
         gs_optimizer = optim.Adam(self.gs_model.parameters, lr=self.hparams['train']['lr'])
@@ -194,11 +195,21 @@ class GSSystem3D(LightningModule):
         
 
         self.log_step("train/total_loss", loss, prog_bar=True)
-        self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
         self.log_step("params/num_samples", self.gs_model.current_num_samples)
         self.logger.experiment.log({
             f"cam_zs/{i}": self.cam_model.camera_zs[i] for i in self.hparams['camera']['cam_ids']
         })
+        self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
+        if self.hparams['train']['refine_camera']:
+            self.log_step("params/lr_cam", self.trainer.optimizers[1].param_groups[0]['lr'])
+
+        if self.hparams['train']['refine_camera']:
+            opt_gs, opt_cam = self.optimizers()
+            opt_gs.zero_grad()
+            opt_cam.zero_grad()
+            self.manual_backward(loss)
+            opt_gs.step()
+            opt_cam.step()
 
         return loss
     

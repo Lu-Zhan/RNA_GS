@@ -63,4 +63,4 @@ class SliceCameras(nn.Module):
     
     @property
     def parameters(self):
-        return self.camera_shift
+        return [self.camera_shift]

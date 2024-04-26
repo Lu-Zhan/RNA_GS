@@ -1,8 +1,8 @@
 exp_name: full_5r
 
 train:
-  lr: 0.001
-  lr_cam: 1e-6
+  lr: 0.002
+  lr_cam: 0.00001
   max_epochs: 10
   num_primarys: 288000
   num_backups: 0
@@ -14,7 +14,7 @@ train:
   codebook_start: 0
   init_rgb: 1
   color_bias: 0.01
-  refine_camera: 0
+  refine_camera: 1
   batch_size: 16
 
 loss:
