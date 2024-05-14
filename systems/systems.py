@@ -82,7 +82,7 @@ class GSSystem3D(LightningModule):
             return [gs_optimizer]
 
     def training_step(self, batch, batch_idx):
-        batch, cam_idxs, slice_idxs = batch
+        batch, cam_indexs, slice_indexs = batch
 
         if self.is_init_rgb is False and self.hparams['train']['init_rgb']:
             with torch.no_grad():
@@ -101,7 +101,7 @@ class GSSystem3D(LightningModule):
                 self.prune_points()
 
         output, cov2d, radii, _ = self.gs_model.render_slice(
-            camera=self.cam_model, cam_idxs=cam_idxs, slice_idxs=slice_idxs,
+            camera=self.cam_model, cam_indexs=cam_indexs, slice_indexs=slice_indexs,
         )
 
         # output = mdp_slices.max(dim=0)[0]   # (n, h, w, k) -> (h, w, k)
@@ -197,7 +197,7 @@ class GSSystem3D(LightningModule):
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/num_samples", self.gs_model.current_num_samples)
         self.logger.experiment.log({
-            f"cam_zs/{i}": self.cam_model.camera_zs[i] for i in self.hparams['camera']['cam_ids']
+            f"cam_zs/{self.hparams['camera']['cam_ids'][i]}": self.cam_model.camera_zs[i] for i in self.hparams['camera']['cam_indexs']
         })
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
         if self.hparams['train']['refine_camera']:
@@ -213,9 +213,9 @@ class GSSystem3D(LightningModule):
 
         return loss
     
-    def obtain_output(self, cam_idxs, slice_idxs):
+    def obtain_output(self, cam_indexs, slice_indexs):
         output, _, _, xys = self.gs_model.render_slice(
-            camera=self.cam_model, cam_idxs=cam_idxs, slice_idxs=slice_idxs,
+            camera=self.cam_model, cam_indexs=cam_indexs, slice_indexs=slice_indexs,
         )
 
         return output, xys
@@ -342,8 +342,8 @@ class GSSystem3D(LightningModule):
         self.log(name, loss, on_step=on_step, on_epoch=on_epoch, prog_bar=prog_bar)
 
     def validation_step(self, batch, batch_idx):
-        batch, cam_idxs, slice_idxs = batch
-        self.validation_step_outputs.append((self.obtain_output(cam_idxs, slice_idxs), batch))
+        batch, cam_indexs, slice_indexs = batch
+        self.validation_step_outputs.append((self.obtain_output(cam_indexs, slice_indexs), batch))
     
     def on_validation_epoch_end(self):
         recon = [x[0][0] for x in self.validation_step_outputs]
@@ -358,7 +358,7 @@ class GSSystem3D(LightningModule):
         self.forward_evaluation(recon, gt, xys, is_predict=False, log_each_plane=True)
 
     def predict_step(self, batch, batch_idx):
-        batch, cam_idxs, slice_idxs = batch
+        batch, cam_indexs, slice_indexs = batch
         self.predict_step_outputs.append((self.obtain_output(cam_idxs, slice_idxs), batch))
     
     def on_predict_epoch_end(self):

@@ -19,12 +19,12 @@ class GaussModel(torch.nn.Module):
 
         self.B_SIZE = B_SIZE
     
-    def render_slice(self, camera, cam_idxs, slice_idxs):
+    def render_slice(self, camera, cam_indexs, slice_indexs):
         means_3d, scales, quats, rgbs, opacities = self.obtain_data()
 
-        if len(slice_idxs) > 1:
+        if len(slice_indexs) > 1:
             outputs_dict = {i: [] for i in range(4)}
-            for cam_idx, slice_idx in zip(cam_idxs, slice_idxs):
+            for cam_idx, slice_idx in zip(cam_indexs, slice_indexs):
                 # (1, h, w, c), (n, 3), (n,), (n, 2), out_imgs, conics, radii, xys
                 outputs = render_single_slice(
                     means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities, 
@@ -38,12 +38,12 @@ class GaussModel(torch.nn.Module):
 
             return [torch.cat(outputs_dict[i], dim=0) for i in range(4)]
             
-        elif len(slice_idxs) == 1:
+        elif len(slice_indexs) == 1:
             return render_single_slice(
                 means_3d=means_3d, scales=scales, quats=quats, rgbs=rgbs, opacities=opacities, 
                 background=self.background, B_SIZE=self.B_SIZE,
-                viewmat=camera.viewmat(cam_idxs), 
-                plane_zs=camera.plane_zs(cam_idxs)[slice_idxs],
+                viewmat=camera.viewmat(cam_indexs), 
+                plane_zs=camera.plane_zs(cam_indexs)[slice_indexs],
                 focal=camera.focal, hw=camera.hw, 
             )
         else:

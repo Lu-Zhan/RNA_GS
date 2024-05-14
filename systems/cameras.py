@@ -29,7 +29,7 @@ class SliceCameras(nn.Module):
         self._init_camera(num_cams, num_slices, camera_z, step_z, refine_camera)
 
     def _init_camera(self, num_cams, num_slices, cam_z, step_z, refine_camera):
-        self.base_camera_zs = torch.ones(num_cams, device=self.device) * cam_z
+        self.base_camera_zs = torch.ones(num_cams, device=self.device).reshape(-1) * cam_z
         self.camera_shift = torch.zeros(num_cams - 1, device=self.device)
 
         if refine_camera:
@@ -58,7 +58,11 @@ class SliceCameras(nn.Module):
     
     @property
     def camera_zs(self):
-        all_camera_shift = torch.cat([torch.zeros_like(self.camera_shift[:1]), self.camera_shift], dim=0)
+        if self.camera_shift.shape[0] > 0:
+            all_camera_shift = torch.cat([torch.zeros_like(self.camera_shift[:1]), self.camera_shift], dim=0)
+        else:
+            all_camera_shift = torch.zeros_like(self.base_camera_zs)
+
         return self.base_camera_zs + all_camera_shift
     
     @property

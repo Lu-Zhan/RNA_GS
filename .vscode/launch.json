@@ -14,7 +14,7 @@
                 "--config",
                 "configs/crop128_5r.yaml",
                 "exp_name",
-                "debug_3d",
+                "debug_s1_recon",
             ]
         }
     ]

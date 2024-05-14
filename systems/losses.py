@@ -48,24 +48,24 @@ def cos_loss(pred_code, codebook):
     return 1 - max_simi.mean()
 
 
-def masked_l1_loss(input, target, th=0.05):
+def masked_l1_loss(input, target, th=0.01):
     mask = target > th
 
     return (input * mask - target * mask).abs().sum() / (mask.sum() + 1e-8)
 
 
-def masked_mse_loss(input, target, th=0.05):
+def masked_mse_loss(input, target, th=0.01):
     mask = target > th
 
     return ((input * mask - target * mask) ** 2).sum() / (mask.sum() + 1e-8)
 
 
-def bg_l1_loss(input, target, th=0.05):
+def bg_l1_loss(input, target, th=0.01):
     mask = target < th
     return ((input * mask).abs()).sum() / (mask.sum() + 1e-8)
 
 
-def bg_mse_loss(input, target, th=0.05):
+def bg_mse_loss(input, target, th=0.01):
     mask = target < th
     return ((input * mask) ** 2).sum() / (mask.sum() + 1e-8)
 

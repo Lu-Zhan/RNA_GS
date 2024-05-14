@@ -61,6 +61,7 @@ def main():
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range
+    config['camera']['cam_ids'] = train_dataset.cam_ids
     config['camera']['cam_indexs'] = train_dataset.cam_indexs
     config['camera']['slice_indexs'] = train_dataset.slice_indexs
     config['camera']['num_slices'] = train_dataset.num_slices

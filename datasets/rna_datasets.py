@@ -14,8 +14,10 @@ class RNADataset3D(Dataset):
         self.num_cams = len(hparams['camera']['cam_ids'])
         self.num_dims = hparams['model']['num_dims']
 
+        self.num_per_epoch = hparams['train']['num_per_epoch']
+
         # [(k, h, w, c)], (vmax, vmin)
-        self.gt_images, self.cam_indexs, self.slice_indexs, self.range = read_images_multi_round(image_folder=self.data_dir)
+        self.gt_images, self.cam_ids, self.slice_indexs, self.range = read_images_multi_round(image_folder=self.data_dir)
         self.dapi_images = read_dapi_image_outside(image_folder=os.path.join(self.data_dir, 'dapi_image')) # (m, h, w, 1)
         # self.dapi_images = torch.relu(self.dapi_images - self.range[0]) / (self.range[1] - self.range[0])
 
@@ -25,11 +27,11 @@ class RNADataset3D(Dataset):
         # select cameras
         self.select_camera(cam_ids=hparams['camera']['cam_ids'])
         # num_slices = [n0, n1, n2, ...]
-        self.num_slices = [self.cam_indexs.count(idx) for idx in hparams['camera']['cam_ids']]
+        self.num_slices = [self.cam_ids.count(idx) for idx in hparams['camera']['cam_ids']]
 
     def __len__(self):
         if self.mode == 'train':
-            return 6000 * self.num_cams * self.num_dims
+            return self.num_per_epoch
         else:
             return self.gt_images.shape[0]
         
@@ -42,10 +44,14 @@ class RNADataset3D(Dataset):
         return self.gt_images.shape[1:]
     
     def select_camera(self, cam_ids):
-        selected_index = [i for i, x in enumerate(self.cam_indexs) if x in cam_ids]
+        selected_index = [i for i, x in enumerate(self.cam_ids) if x in cam_ids]
         self.gt_images = self.gt_images[selected_index]
-        self.cam_indexs = [self.cam_indexs[i] for i in selected_index]
+        self.cam_ids = [self.cam_ids[i] for i in selected_index]
         self.slice_indexs = [self.slice_indexs[i] for i in selected_index]
+
+        self.cam_indexs = []
+        for i, cam_id in enumerate(cam_ids):
+            self.cam_indexs += [i] * self.cam_ids.count(cam_id)
     
 
 class RNADataset3DSingleRound(Dataset):
