@@ -65,7 +65,7 @@ camera:
   max_num_slices: 50
   max_num_cams: 5
   num_dims: 3
-  cam_ids: [0]
+  cam_ids: [0, 1, 2, 3, 4]
 
 view:
   classes:

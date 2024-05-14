@@ -371,10 +371,12 @@ class GSSystem3D(LightningModule):
     def on_save_checkpoint(self, checkpoint):
         checkpoint['gs_model'] = self.gs_model
         checkpoint['mdp_dapi_image'] = self.mdp_dapi_image
+        checkpoint['cam_model'] = self.cam_model
 
     def on_load_checkpoint(self, checkpoint):
         self.gs_model = checkpoint['gs_model']
         self.mdp_dapi_image = checkpoint['mdp_dapi_image']
+        # self.cam_model = checkpoint['cam_model']
 
     def _original(self, x):
         x = (x - self.hparams['train']['color_bias']) / (1 - self.hparams['train']['color_bias'] * 2)

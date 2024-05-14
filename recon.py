@@ -52,6 +52,7 @@ def main():
         mode='max',
     )
 
+    config['camera']['cam_ids'] = config['camera']['cam_ids'][:1]
     # model & dataloader
     train_dataset = RNADataset3D(hparams=config, mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)

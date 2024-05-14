@@ -19,10 +19,10 @@ torch.set_float32_matmul_precision('medium')
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])
-    parser.add_argument("--config", type=str, default='configs/step2_regcam_c128.yaml')
+    parser.add_argument("--config", type=str, default='configs/step1_recon_c128.yaml')
     parser.add_argument("--exp_name", type=str, default='')
     parser.add_argument("--exp_dir", type=str, default='outputs_xyz/')
-    parser.add_argument("--recon_dir", type=str, default='outputs_xyz/4dgcjrgd')
+    parser.add_argument("--recon_dir", type=str, default='outputs_xyz/d4iayib3')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
     
@@ -55,6 +55,7 @@ def main():
     )
 
     # model & dataloader
+    config['camera']['cam_ids'] = config['camera']['cam_ids'][1:]
     train_dataset = RNADataset3D(hparams=config, mode='train')
     train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
 
@@ -68,7 +69,7 @@ def main():
     # config['camera']['slice_indexs'] = train_dataset.slice_indexs
     # config['camera']['num_slices'] = train_dataset.num_slices
 
-    recon_ckpt_path = glob.glob(os.path.join(args.recon_dir, 'checkpoints', 'psnr=*.ckpt'))
+    recon_ckpt_path = glob.glob(os.path.join(args.recon_dir, 'checkpoints', 'psnr=*.ckpt'))[0]
     gs_system = GSRegSystem.load_from_checkpoint(recon_ckpt_path)
 
     trainer = Trainer(

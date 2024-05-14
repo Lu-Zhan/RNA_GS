@@ -18,7 +18,7 @@ from systems.recon_systems import *
 
 class GSRegSystem(GSSystem3D):
     def configure_optimizers(self):
-        cam_optimizer = optim.Adam(self.cam_model.parameters(index=self.hparams['camera']['cam_ids']), lr=self.hparams['train']['lr_cam'])
+        cam_optimizer = optim.Adam(self.cam_model.parameters, lr=self.hparams['train']['lr_cam'])
         return cam_optimizer
 
     def training_step(self, batch, batch_idx):
@@ -46,7 +46,7 @@ class GSRegSystem(GSSystem3D):
         
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.logger.experiment.log({
-            f"cam_zs/{self.hparams['camera']['cam_ids'][i]}": self.cam_model.camera_zs[i] for i in self.hparams['camera']['cam_indexs']
+            f"cam_zs/{idx}": self.cam_model.camera_zs[idx] for idx in range(self.hparams['camera']['max_num_cams'])
         })
         if self.hparams['train']['refine_camera']:
             self.log_step("params/lr_cam", self.trainer.optimizers[1].param_groups[0]['lr'])
@@ -96,15 +96,4 @@ class GSRegSystem(GSSystem3D):
             })
 
         return mean_3d_psnr
-
-    def on_save_checkpoint(self, checkpoint):
-        checkpoint['gs_model'] = self.gs_model
-        checkpoint['mdp_dapi_image'] = self.mdp_dapi_image
-        checkpoint['cam_model'] = self.cam_model
-
-    def on_load_checkpoint(self, checkpoint):
-        self.gs_model = checkpoint['gs_model']
-        self.mdp_dapi_image = checkpoint['mdp_dapi_image']
-        self.cam_model = checkpoint['cam_model']
-    
         

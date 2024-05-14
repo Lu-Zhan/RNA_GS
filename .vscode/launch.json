@@ -21,11 +21,13 @@
             "name": "regcam",
             "type": "debugpy",
             "request": "launch",
-            "program": "reg.py",
+            "program": "regcam.py",
             "console": "integratedTerminal",
             "args": [
-                "--config",
-                "configs/step2_regcam_c128.yaml",
+                // "--config",
+                // "configs/step2_regcam_c128.yaml",
+                "--recon_dir",
+                "outputs_xyz/d4iayib3",
                 "exp_name",
                 "debug_s2_regcam",
             ]

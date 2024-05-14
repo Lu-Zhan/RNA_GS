@@ -1,9 +1,9 @@
-exp_name: step2_regcam_c128
+exp_name: step1_recon_c128_newcam
 
 train:
-  lr: 0.002
+  lr: 0.001
   lr_cam: 0.001
-  max_epochs: 3
+  max_epochs: 10
   num_primarys: 800
   num_backups: 0
   tile_size: 16
@@ -14,27 +14,38 @@ train:
   codebook_start: 0
   init_rgb: 1
   color_bias: 0.01
+  refine_camera: 0
   batch_size: 16
   num_per_epoch: 32000
 
 loss:
-  w_l1: 0
-  w_masked_l1: 1
-  w_bg_l1: 1
-  w_l2: 1
-  w_masked_l2: 0
-  w_bg_l2: 0
-  w_mdp_l1: 0
-  w_mdp_masked_l1: 1
-  w_mdp_bg_l1: 1
-  w_mdp_l2: 1
-  w_mdp_masked_l2: 0
-  w_mdp_bg_l2: 0
-
-  w_rho: 0
-  w_radius: 0
-  w_mi: 0
-  w_cos: 0
+  3d:
+    w_l1: 1
+    w_masked_l1: 1
+    w_bg_l1: 1
+    w_l2: 0
+    w_masked_l2: 0
+    w_bg_l2: 0
+  2d:
+    w_l1: 1
+    w_masked_l1: 1
+    w_bg_l1: 1
+    w_l2: 0
+    w_masked_l2: 0
+    w_bg_l2: 0
+  mdp:
+    w_l1: 1
+    w_masked_l1: 1
+    w_bg_l1: 1
+    w_l2: 0
+    w_masked_l2: 0
+    w_bg_l2: 0
+  shape:
+    w_rho: 0
+    w_radius: 0
+  class:
+    w_mi: 0
+    w_cos: 0
 
 process:
   bg_filter_th: -1
@@ -47,11 +58,31 @@ data:
 model:
   checkpoint_path: checkpoints
   save_gif: 0
-  camera_z: -8
-  step_z: 0.05
-  max_num_slice: 50
-  max_num_cams: 5
-  num_dims: 3
 
 camera:
+  camera_z: -8
+  step_z: 0.05
+  max_num_slices: 50
+  max_num_cams: 5
+  num_dims: 3
   cam_ids: [1, 2, 3, 4]
+
+view:
+  classes:
+  - 'Snap25'
+  - 'Slc17a7'
+  - 'Gad1'
+  - 'Gad2'
+  - 'Plp1'
+  - 'Mbp'
+  - 'Aqp4'
+  - 'Rgs5'
+  - 'Agt'
+  - 'Chrm3'
+  - 'Dclk3'
+  - 'Necab1'
+  - 'Cspg5'
+  - 'Tnr'
+  - 'Pdgfrb'
+  - 'Anln'
+  - 'Gfap'
