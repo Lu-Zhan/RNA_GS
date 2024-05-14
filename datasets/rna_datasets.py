@@ -17,7 +17,7 @@ class RNADataset3D(Dataset):
         self.num_per_epoch = hparams['train']['num_per_epoch']
 
         # [(k, h, w, c)], (vmax, vmin)
-        self.gt_images, self.cam_ids, self.slice_indexs, self.range = read_images_from_rounds(image_folder=self.data_dir, num_round=1) # (m, h, w, c)
+        self.gt_images, self.cam_ids, self.slice_indexs, self.range = read_images_from_rounds(image_folder=self.data_dir, rounds=hparams['camera']['cam_ids']) # (m, h, w, c)
         self.dapi_images = read_dapi_image_outside(image_folder=os.path.join(self.data_dir, 'dapi_image')) # (m, h, w, 1)
         # self.dapi_images = torch.relu(self.dapi_images - self.range[0]) / (self.range[1] - self.range[0])
 

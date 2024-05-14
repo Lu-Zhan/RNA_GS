@@ -27,7 +27,8 @@ class GSSystem3D(LightningModule):
         os.makedirs(os.path.join(self.save_folder, 'classes'), exist_ok=True)
         os.makedirs(os.path.join(self.save_folder, 'view_3d'), exist_ok=True)
 
-        self.mdp_image = None
+        self.gt_2d = None
+        self.gt_3d = None
         self.is_init_rgb = False
 
         self.cam_model = SliceCameras(
@@ -82,16 +83,16 @@ class GSSystem3D(LightningModule):
             return [gs_optimizer]
 
     def training_step(self, batch, batch_idx):
-        batch, cam_indexs, slice_indexs = batch
+        gt_3d, cam_indexs, slice_indexs = batch
 
         if self.is_init_rgb is False and self.hparams['train']['init_rgb']:
             with torch.no_grad():
                 xys = self.gs_model.obtain_xys(camera=self.cam_model)
-                self.gs_model.init_rgbs(xys=xys, gt_images=batch.max(dim=0)[0])
+                self.gs_model.init_rgbs(xys=xys, gt_images=gt_3d.max(dim=0)[0])
             self.is_init_rgb = True
 
-        if self.mdp_image is None:
-            self.mdp_image = batch.max(dim=-1)[0]   #.max(dim=0)[0]
+        gt_2d = gt_3d.max(dim=0)[0]    # (k, h, w, c) -> (h, w, c)
+        gt_mdp = gt_2d.max(dim=-1)[0]  # (h, w, c) -> (h, w)
 
         den_interval = self.hparams['train']['densification_interval']
         den_start = self.hparams['train']['densification_start']
@@ -100,100 +101,23 @@ class GSSystem3D(LightningModule):
             if self.global_step % (den_interval + 1) == 0 and self.global_step > den_start:
                 self.prune_points()
 
-        output, cov2d, radii, _ = self.gs_model.render_slice(
+        recon_3d, cov2d, radii, _ = self.gs_model.render_slice(
             camera=self.cam_model, cam_indexs=cam_indexs, slice_indexs=slice_indexs,
         )
 
-        # output = mdp_slices.max(dim=0)[0]   # (n, h, w, k) -> (h, w, k)
-        mdp_output = output.max(dim=-1)[0]  #.max(dim=0)[0]   # (n, h, w, k) -> (h, w)
+        recon_2d = recon_3d.max(dim=0)[0]  #.max(dim=0)[0]   # (n, h, w, k) -> (h, w, k)
+        recon_mdp = recon_2d.max(dim=-1)[0]  #.max(dim=0)[0]   # (h, w, k) -> (h, w)
+        
+        results = {
+            '3d': (recon_3d, gt_3d),
+            '2d': (recon_2d, gt_2d),
+            'mdp': (recon_mdp, gt_mdp),
+            'cov2d': cov2d,
+            'radii': radii,
+        }
 
-        loss = 0.
-
-        if self.hparams['loss']['w_l1'] > 0:
-            loss_l1 = l1_loss(output, batch)
-            loss += self.hparams['loss']['w_l1'] * loss_l1
-            self.log_step("train/loss_l1", loss_l1)
-
-        if self.hparams['loss']['w_l2'] > 0:
-            loss_l2 = mse_loss(output, batch)
-            loss += self.hparams['loss']['w_l2'] * loss_l2
-            self.log_step("train/loss_l2", loss_l2)
+        loss = self.compute_loss(results)
         
-        if self.hparams['loss']['w_masked_l2'] > 0:
-            loss_masked_l2 = masked_mse_loss(output, batch)
-            loss += self.hparams['loss']['w_masked_l2'] * loss_masked_l2
-            self.log_step("train/loss_masked_l2", loss_masked_l2)
-        
-        if self.hparams['loss']['w_bg_l2'] > 0:
-            loss_bg_l2 = bg_mse_loss(output, batch)
-            loss += self.hparams['loss']['w_bg_l2'] * loss_bg_l2
-            self.log_step("train/loss_bg_l2", loss_bg_l2)
-        
-        if self.hparams['loss']['w_masked_l1'] > 0:
-            loss_masked_l1 = masked_l1_loss(output, batch)
-            loss += self.hparams['loss']['w_masked_l1'] * loss_masked_l1
-            self.log_step("train/loss_masked_l1", loss_masked_l1)
-        
-        if self.hparams['loss']['w_bg_l1'] > 0:
-            loss_bg_l1 = bg_l1_loss(output, batch)
-            loss += self.hparams['loss']['w_bg_l1'] * loss_bg_l1
-            self.log_step("train/loss_bg_l1", loss_bg_l1)
-
-        if self.hparams['loss']['w_rho'] > 0:
-            loss_rho = rho_loss(cov2d)
-            loss += self.hparams['loss']['w_rho'] * loss_rho
-            self.log_step("train/loss_rho", loss_rho)
-        
-        if self.hparams['loss']['w_radius'] > 0:
-            loss_radius = radius_loss(radii.to(self.gs_model.means_3d.dtype))
-            loss += self.hparams['loss']['w_radius'] * loss_radius
-            self.log_step("train/loss_radius", loss_radius)
-            
-        # losses for map image
-        if self.hparams['loss']['w_mdp_l2'] > 0:
-            loss_mdp_l2 = mse_loss(mdp_output, self.mdp_image)
-            loss += self.hparams['loss']['w_mdp_l2'] * loss_mdp_l2
-            self.log_step("train/loss_mdp_l2", loss_mdp_l2)
-        
-        if self.hparams['loss']['w_mdp_masked_l2'] > 0:
-            loss_mdp_masked_l2 = masked_mse_loss(mdp_output, self.mdp_image)
-            loss += self.hparams['loss']['w_mdp_masked_l2'] * loss_mdp_masked_l2
-            self.log_step("train/loss_mdp_masked_l2", loss_mdp_masked_l2)
-        
-        if self.hparams['loss']['w_mdp_bg_l2'] > 0:
-            loss_mdp_bg_l2 = bg_mse_loss(mdp_output, self.mdp_image)
-            loss += self.hparams['loss']['w_mdp_bg_l2'] * loss_mdp_bg_l2
-            self.log_step("train/loss_mdp_bg_l2", loss_mdp_bg_l2)
-        
-        if self.hparams['loss']['w_mdp_l1'] > 0:
-            loss_mdp_l1 = l1_loss(mdp_output, self.mdp_image)
-            loss += self.hparams['loss']['w_mdp_l1'] * loss_mdp_l1
-            self.log_step("train/loss_mdp_l1", loss_mdp_l1)
-
-        if self.hparams['loss']['w_mdp_masked_l1'] > 0:
-            loss_mdp_masked_l1 = masked_l1_loss(mdp_output, self.mdp_image)
-            loss += self.hparams['loss']['w_mdp_masked_l1'] * loss_mdp_masked_l1
-            self.log_step("train/loss_mdp_masked_l1", loss_mdp_masked_l1)
-        
-        if self.hparams['loss']['w_mdp_bg_l1'] > 0:
-            loss_mdp_bg_l1 = bg_l1_loss(mdp_output, self.mdp_image)
-            loss += self.hparams['loss']['w_mdp_bg_l1'] * loss_mdp_bg_l1
-            self.log_step("train/loss_mdp_bg_l1", loss_mdp_bg_l1)
-        
-        # pred_code = self.gs_model.colors
-        # loss_mi = mi_loss(pred_code, self.mi_rna_class)
-        # self.log_step("train/loss_mi", loss_mi)
-
-        # loss_cos = cos_loss(pred_code, self.rna_class)
-        # self.log_step("train/loss_cos", loss_cos)
-
-        # if self.hparams['loss']['w_mi'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
-        #     loss += self.hparams['loss']['w_mi'] * loss_mi
-
-        # if self.hparams['loss']['w_cos'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
-        #     loss += self.hparams['loss']['w_cos'] * loss_cos
-        
-
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/num_samples", self.gs_model.current_num_samples)
         self.logger.experiment.log({
@@ -211,6 +135,65 @@ class GSSystem3D(LightningModule):
             opt_gs.step()
             opt_cam.step()
 
+        return loss
+
+    def compute_loss(self, results):
+        loss = 0.
+
+        for recon_type in ['3d', '2d', 'mdp']:
+            pred_data, gt_data = results[recon_type]
+            if self.hparams['loss'][recon_type]['w_l1'] > 0:
+                loss_l1 = l1_loss(pred_data, gt_data)
+                loss += self.hparams['loss'][recon_type]['w_l1'] * loss_l1
+                self.log_step(f"train_{recon_type}/loss_l1", loss_l1)
+            
+            if self.hparams['loss'][recon_type]['w_masked_l1'] > 0:
+                loss_masked_l1 = masked_l1_loss(pred_data, gt_data)
+                loss += self.hparams['loss'][recon_type]['w_masked_l1'] * loss_masked_l1
+                self.log_step(f"train_{recon_type}/loss_masked_l1", loss_masked_l1)
+            
+            if self.hparams['loss'][recon_type]['w_bg_l1'] > 0:
+                loss_bg_l1 = bg_l1_loss(pred_data, gt_data)
+                loss += self.hparams['loss'][recon_type]['w_bg_l1'] * loss_bg_l1
+                self.log_step(f"train_{recon_type}/loss_bg_l1", loss_bg_l1)
+            
+            if self.hparams['loss'][recon_type]['w_l2'] > 0:
+                loss_l2 = mse_loss(pred_data, gt_data)
+                loss += self.hparams['loss'][recon_type]['w_l2'] * loss_l2
+                self.log_step(f"train_{recon_type}/loss_l2", loss_l2)
+            
+            if self.hparams['loss'][recon_type]['w_masked_l2'] > 0:
+                loss_masked_l2 = masked_mse_loss(pred_data, gt_data)
+                loss += self.hparams['loss'][recon_type]['w_masked_l2'] * loss_masked_l2
+                self.log_step(f"train_{recon_type}/loss_masked_l2", loss_masked_l2)
+            
+            if self.hparams['loss'][recon_type]['w_bg_l2'] > 0:
+                loss_bg_l2 = bg_mse_loss(pred_data, gt_data)
+                loss += self.hparams['loss'][recon_type]['w_bg_l2'] * loss_bg_l2
+                self.log_step(f"train_{recon_type}/loss_bg_l2", loss_bg_l2)
+            
+        if self.hparams['loss']['shape']['w_rho'] > 0:
+            loss_rho = rho_loss(results['cov2d'])
+            loss += self.hparams['loss']['w_rho'] * loss_rho
+            self.log_step("train/loss_rho", loss_rho)
+        
+        if self.hparams['loss']['shape']['w_radius'] > 0:
+            loss_radius = radius_loss(results['radii'].to(self.gs_model.means_3d.dtype))
+            loss += self.hparams['loss']['w_radius'] * loss_radius
+            self.log_step("train/loss_radius", loss_radius)
+        
+        # pred_code = self.gs_model.colors
+        # loss_mi = mi_loss(pred_code, self.mi_rna_class)
+        # self.log_step("train/loss_mi", loss_mi)
+
+        # loss_cos = cos_loss(pred_code, self.rna_class)
+        # self.log_step("train/loss_cos", loss_cos)
+
+        # if self.hparams['loss']['class']['w_mi'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
+        #     loss += self.hparams['loss']['w_mi'] * loss_mi
+
+        # if self.hparams['loss']['class']['w_cos'] > 0 and self.global_step > self.hparams['train']['codebook_start']:
+        #     loss += self.hparams['loss']['w_cos'] * loss_cos
         return loss
     
     def obtain_output(self, cam_indexs, slice_indexs):

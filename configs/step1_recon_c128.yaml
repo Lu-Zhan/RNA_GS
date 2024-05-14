@@ -19,23 +19,33 @@ train:
   num_per_epoch: 32000
 
 loss:
-  w_l1: 0
-  w_masked_l1: 1
-  w_bg_l1: 1
-  w_l2: 1
-  w_masked_l2: 0
-  w_bg_l2: 0
-  w_mdp_l1: 0
-  w_mdp_masked_l1: 1
-  w_mdp_bg_l1: 1
-  w_mdp_l2: 1
-  w_mdp_masked_l2: 0
-  w_mdp_bg_l2: 0
-
-  w_rho: 0
-  w_radius: 0
-  w_mi: 0
-  w_cos: 0
+  3d:
+    w_l1: 1
+    w_masked_l1: 1
+    w_bg_l1: 1
+    w_l2: 0
+    w_masked_l2: 0
+    w_bg_l2: 0
+  2d:
+    w_l1: 1
+    w_masked_l1: 1
+    w_bg_l1: 1
+    w_l2: 0
+    w_masked_l2: 0
+    w_bg_l2: 0
+  mdp:
+    w_l1: 1
+    w_masked_l1: 1
+    w_bg_l1: 1
+    w_l2: 0
+    w_masked_l2: 0
+    w_bg_l2: 0
+  shape:
+    w_rho: 0
+    w_radius: 0
+  class:
+    w_mi: 0
+    w_cos: 0
 
 process:
   bg_filter_th: -1

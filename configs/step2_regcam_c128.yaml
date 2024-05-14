@@ -14,7 +14,6 @@ train:
   codebook_start: 0
   init_rgb: 1
   color_bias: 0.01
-  refine_camera: 0
   batch_size: 16
   num_per_epoch: 32000
 
@@ -51,27 +50,7 @@ model:
   camera_z: -8
   step_z: 0.05
   num_slice: 46
-  num_dims: 1
+  num_dims: 3
 
 camera:
-  cam_ids: [0]
-
-view:
-  classes:
-  - 'Snap25'
-  - 'Slc17a7'
-  - 'Gad1'
-  - 'Gad2'
-  - 'Plp1'
-  - 'Mbp'
-  - 'Aqp4'
-  - 'Rgs5'
-  - 'Agt'
-  - 'Chrm3'
-  - 'Dclk3'
-  - 'Necab1'
-  - 'Cspg5'
-  - 'Tnr'
-  - 'Pdgfrb'
-  - 'Anln'
-  - 'Gfap'
+  cam_ids: [1, 2, 3, 4]

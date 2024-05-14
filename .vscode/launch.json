@@ -5,16 +5,29 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug train",
+            "name": "recon",
             "type": "debugpy",
             "request": "launch",
             "program": "train.py",
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "configs/crop128_5r.yaml",
+                "configs/step1_recon_c128.yaml",
                 "exp_name",
                 "debug_s1_recon",
+            ]
+        },
+        {
+            "name": "regcam",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "reg.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "configs/step2_regcam_c128.yaml",
+                "exp_name",
+                "debug_s2_regcam",
             ]
         }
     ]

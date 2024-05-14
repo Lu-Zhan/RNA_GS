@@ -9,11 +9,11 @@ from skimage import io
 from glob import glob
 
 
-def read_images_from_rounds(image_folder, num_round=5):
+def read_images_from_rounds(image_folder, rounds=[0]):
     # /home/luzhan/Projects/rna/data/IM41236/IM41441/Rx/1_Z0046_C0004.tif
 
     round_images = []
-    for round in range(num_round):
+    for round in rounds:
         round = f'R{round+1}'
 
         image_paths = glob(os.path.join(image_folder, round, '1', '*.tif'))
