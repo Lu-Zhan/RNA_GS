@@ -51,10 +51,10 @@ model:
   camera_z: -8
   step_z: 0.05
   num_slice: 46
-  num_dims: 1
+  num_dims: 3
 
 camera:
-  cam_ids: [1]
+  cam_ids: [0]
 
 view:
   classes:

@@ -359,7 +359,7 @@ class GSSystem3D(LightningModule):
 
     def predict_step(self, batch, batch_idx):
         batch, cam_indexs, slice_indexs = batch
-        self.predict_step_outputs.append((self.obtain_output(cam_idxs, slice_idxs), batch))
+        self.predict_step_outputs.append((self.obtain_output(cam_indexs, slice_indexs), batch))
     
     def on_predict_epoch_end(self):
         recon = [x[0][0] for x in self.predict_step_outputs]
