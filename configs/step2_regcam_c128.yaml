@@ -1,4 +1,4 @@
-exp_name: step1_recon_c128
+exp_name: step2_regcam_c128
 
 train:
   lr: 0.002

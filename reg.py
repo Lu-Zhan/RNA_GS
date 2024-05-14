@@ -1,6 +1,7 @@
 import os
 import yaml
 import torch
+import glob
 import logging
 logging.getLogger('lightning').setLevel(0)
 
@@ -10,7 +11,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
-from systems import GSSystem3D
+from systems import GSRegSystem
 from datasets import RNADataset3D
 
 torch.set_float32_matmul_precision('medium')
@@ -18,9 +19,10 @@ torch.set_float32_matmul_precision('medium')
 def main():
     parser = ArgumentParser()
     parser.add_argument("--devices", nargs='+', default=[0])
-    parser.add_argument("--config", type=str, default='configs/crop64_rawtiff.yaml')
+    parser.add_argument("--config", type=str, default='configs/step2_regcam_c128.yaml')
     parser.add_argument("--exp_name", type=str, default='')
     parser.add_argument("--exp_dir", type=str, default='outputs_xyz/')
+    parser.add_argument("--recon_dir", type=str, default='outputs_xyz/4dgcjrgd')
     parser.add_argument("extra", nargs=REMAINDER, help='Modify hparams.')
     args = parser.parse_args()
     
@@ -37,7 +39,7 @@ def main():
         save_dir=config['exp_dir'],
     )
 
-    ckpt_path = os.path.join(logger.save_dir, logger.experiment.id, 'checkpoints')
+    ckpt_path = os.path.join(logger.save_dir, logger.experiment.id, 'checkpoints_cam')
     os.makedirs(ckpt_path, exist_ok=True)
     config['exp_dir'] = os.path.dirname(ckpt_path)
 
@@ -65,7 +67,9 @@ def main():
     config['camera']['cam_indexs'] = train_dataset.cam_indexs
     config['camera']['slice_indexs'] = train_dataset.slice_indexs
     config['camera']['num_slices'] = train_dataset.num_slices
-    gs_system = GSSystem3D(hparams=config, dapi_images=train_dataset.dapi_images)
+
+    recon_ckpt_path = glob.glob(os.path.join(args.recon_dir, 'checkpoints', 'psnr=*.ckpt'))
+    gs_system = GSRegSystem.load_from_checkpoint(recon_ckpt_path)
 
     trainer = Trainer(
         benchmark=True,
@@ -88,9 +92,6 @@ def main():
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader,
     )
-
-    gs_system = GSSystem3D.load_from_checkpoint(checkpoint_callback.best_model_path)
-    trainer.predict(model=gs_system, dataloaders=val_dataloader)
 
 
 def obtain_config(args):

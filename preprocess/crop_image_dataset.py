@@ -54,7 +54,7 @@ if __name__ == "__main__":
                 crop_images_by_tile_number(img_folder, dst_round_folder, i, j, tile_number)
 
                 # crop dapi image
-                dapi_image_path = os.path.join(src_folder, 'dapi_image', f'F1R{idx+1}Ch1.tif')
+                dapi_image_path = os.path.join(src_folder, f'dapi_image/{tile_number}/{new_folder_name}_{tile_number ** 2}', f'F1R{idx+1}Ch1.tif')
                 save_image_path = os.path.join(dst_folder, f'dapi_image', f'F1R{idx}Ch1.tif')
 
                 os.makedirs(os.path.dirname(save_image_path), exist_ok=True)
