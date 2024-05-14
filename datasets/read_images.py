@@ -9,11 +9,11 @@ from skimage import io
 from glob import glob
 
 
-def read_images_from_rounds(image_folder, rounds=[0]):
+def read_images_from_rounds(image_folder, num_rounds=5):
     # /home/luzhan/Projects/rna/data/IM41236/IM41441/Rx/1_Z0046_C0004.tif
 
     round_images = []
-    for round in rounds:
+    for round in range(num_rounds):
         round = f'R{round+1}'
 
         image_paths = glob(os.path.join(image_folder, round, '1', '*.tif'))
@@ -42,7 +42,7 @@ def read_images_from_rounds(image_folder, rounds=[0]):
         imgs_tensor = torch.cat([images[f'C{i+2:04d}'] for i in range(3)], dim=-1) / 1.0 # (n, h, w, 3)
         round_images.append(imgs_tensor)
     
-    cam_indexs = [n for n, x in enumerate(round_images) for _ in range(x.shape[0])] # [0, ..., 0, 1, ...]
+    cam_indexs = [r for r, x in enumerate(round_images) for _ in range(x.shape[0])] # [0, ..., 0, 1, ...]
     slice_indexs = [i for x in round_images for i in range(x.shape[0])]   # [0, ..., n0, 0, ..., n1, ...]
     
     all_images = torch.cat(round_images, dim=0) # (5n, h, w, 3)

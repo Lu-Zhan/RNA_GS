@@ -49,7 +49,8 @@ model:
   save_gif: 0
   camera_z: -8
   step_z: 0.05
-  num_slice: 46
+  max_num_slice: 50
+  max_num_cams: 5
   num_dims: 3
 
 camera:

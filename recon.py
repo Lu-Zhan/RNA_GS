@@ -61,10 +61,10 @@ def main():
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range
-    config['camera']['cam_ids'] = train_dataset.cam_ids
-    config['camera']['cam_indexs'] = train_dataset.cam_indexs
-    config['camera']['slice_indexs'] = train_dataset.slice_indexs
-    config['camera']['num_slices'] = train_dataset.num_slices
+    # config['camera']['cam_ids'] = train_dataset.cam_ids
+    # config['camera']['cam_indexs'] = train_dataset.cam_indexs
+    # config['camera']['slice_indexs'] = train_dataset.slice_indexs
+    # config['camera']['num_slices'] = train_dataset.num_slices
     gs_system = GSSystem3D(hparams=config, dapi_images=train_dataset.dapi_images)
 
     trainer = Trainer(
@@ -77,7 +77,7 @@ def main():
         precision="32-true",
         log_every_n_steps=50,
         strategy="auto",
-        check_val_every_n_epoch=1,
+        check_val_every_n_epoch=2,
         enable_model_summary=False,
         num_sanity_val_steps=1,
         # limit_train_batches=1,

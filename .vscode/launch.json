@@ -8,7 +8,7 @@
             "name": "recon",
             "type": "debugpy",
             "request": "launch",
-            "program": "train.py",
+            "program": "recon.py",
             "console": "integratedTerminal",
             "args": [
                 "--config",

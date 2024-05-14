@@ -7,8 +7,8 @@ import torch.nn as nn
 class SliceCameras(nn.Module):
     def __init__(
         self, 
-        num_cams,
-        num_slices, # [n0, n1, n3, ...]
+        max_num_cams,
+        max_num_slices,
         num_dims,
         hw,
         step_z=0.025, 
@@ -26,22 +26,17 @@ class SliceCameras(nn.Module):
         self.device = device
         self.num_dims = num_dims
 
-        self._init_camera(num_cams, num_slices, camera_z, step_z, refine_camera)
+        self._init_camera(max_num_cams, max_num_slices, camera_z, step_z)
 
-    def _init_camera(self, num_cams, num_slices, cam_z, step_z, refine_camera):
+    def _init_camera(self, num_cams, num_slices, cam_z, step_z):
         self.base_camera_zs = torch.ones(num_cams, device=self.device).reshape(-1) * cam_z
         self.camera_shift = torch.zeros(num_cams - 1, device=self.device)
+        self.camera_shift.requires_grad = True
 
-        if refine_camera:
-            self.camera_shift.requires_grad = True
-
-        self.current_viewmat = torch.eye(4, device=self.device).unsqueeze(0).repeat(num_cams, 1, 1)   # (num_cams, 4, 4)
+        # self.current_viewmat = torch.eye(4, device=self.device).unsqueeze(0).repeat(num_cams, 1, 1)   # (num_cams, 4, 4)
         # self.current_viewmat[:, 2, -1] = -self.camera_zs
 
-        self.current_plane_zs = []
-        for num_slice in num_slices:
-            each_plane_zs = (torch.arange(num_slice, device=self.device)) * step_z - num_slice / 2 * step_z - cam_z
-            self.current_plane_zs.append(each_plane_zs)
+        self.current_plane_zs = [-1 + torch.arange(num_slices, device=self.device) * step_z - cam_z for _ in range(num_cams)]
 
     def viewmat(self, cam_index):
         view_mat = torch.tensor([
@@ -58,13 +53,12 @@ class SliceCameras(nn.Module):
     
     @property
     def camera_zs(self):
-        if self.camera_shift.shape[0] > 0:
-            all_camera_shift = torch.cat([torch.zeros_like(self.camera_shift[:1]), self.camera_shift], dim=0)
-        else:
-            all_camera_shift = torch.zeros_like(self.base_camera_zs)
-
+        all_camera_shift = torch.cat([torch.zeros_like(self.camera_shift[:1]), self.camera_shift], dim=0)
         return self.base_camera_zs + all_camera_shift
     
     @property
     def parameters(self):
         return [self.camera_shift]
+    
+    def load_camera_shift(self, camera_shift):
+        self.camera_shift.data = camera_shift

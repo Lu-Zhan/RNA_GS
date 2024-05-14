@@ -27,18 +27,15 @@ class GSSystem3D(LightningModule):
         os.makedirs(os.path.join(self.save_folder, 'classes'), exist_ok=True)
         os.makedirs(os.path.join(self.save_folder, 'view_3d'), exist_ok=True)
 
-        self.gt_2d = None
-        self.gt_3d = None
         self.is_init_rgb = False
 
         self.cam_model = SliceCameras(
-            num_cams=len(hparams['camera']['cam_ids']),
-            num_slices=hparams['camera']['num_slices'],
-            num_dims=self.hparams['model']['num_dims'],
+            max_num_cams=hparams['camera']['max_num_cams'],
+            max_num_slices=hparams['camera']['max_num_slices'],
+            num_dims=self.hparams['camera']['num_dims'],
             hw=self.hparams['hw'],
-            step_z=self.hparams['model']['step_z'],
-            camera_z=self.hparams['model']['camera_z'],
-            refine_camera=self.hparams['train']['refine_camera'],
+            step_z=self.hparams['camera']['step_z'],
+            camera_z=self.hparams['camera']['camera_z'],
             device=torch.device(f"cuda:{self.hparams['devices'][0]}"),
         )
 
@@ -54,7 +51,7 @@ class GSSystem3D(LightningModule):
             self.rna_class, self.rna_name = read_codebook(path=self.hparams['data']['codebook_path'], bg=False)
             self.mi_rna_class, self.mi_rna_name = read_codebook(path=self.hparams['data']['codebook_path'], bg=True)
         else:
-            num_dims = self.hparams['model']['num_dims']
+            num_dims = self.hparams['camera']['num_dims']
             self.rna_class, self.rna_name = np.array([[1.] * num_dims]), np.array(['full'])
             self.mi_rna_class, self.mi_rna_name = np.array([[1.] * num_dims, [0.] * num_dims]), np.array(['full', 'background'])
 
@@ -121,7 +118,7 @@ class GSSystem3D(LightningModule):
         self.log_step("train/total_loss", loss, prog_bar=True)
         self.log_step("params/num_samples", self.gs_model.current_num_samples)
         self.logger.experiment.log({
-            f"cam_zs/{self.hparams['camera']['cam_ids'][i]}": self.cam_model.camera_zs[i] for i in self.hparams['camera']['cam_indexs']
+            f"cam_zs/{self.hparams['camera']['cam_ids'][i]}": self.cam_model.camera_zs[i] for i in self.hparams['camera']['cam_ids']
         })
         self.log_step("params/lr", self.trainer.optimizers[0].param_groups[0]['lr'])
         if self.hparams['train']['refine_camera']:

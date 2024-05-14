@@ -18,7 +18,7 @@ from systems.recon_systems import *
 
 class GSRegSystem(GSSystem3D):
     def configure_optimizers(self):
-        cam_optimizer = optim.Adam(self.cam_model.parameters, lr=self.hparams['train']['lr_cam'])
+        cam_optimizer = optim.Adam(self.cam_model.parameters(index=self.hparams['camera']['cam_ids']), lr=self.hparams['train']['lr_cam'])
         return cam_optimizer
 
     def training_step(self, batch, batch_idx):

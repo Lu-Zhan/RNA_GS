@@ -1,4 +1,4 @@
-exp_name: step1_recon_c128_d3
+exp_name: step1_recon_c128_newcam
 
 train:
   lr: 0.001
@@ -58,12 +58,13 @@ data:
 model:
   checkpoint_path: checkpoints
   save_gif: 0
-  camera_z: -8
-  step_z: 0.05
-  num_slice: 46
-  num_dims: 3
 
 camera:
+  camera_z: -8
+  step_z: 0.05
+  max_num_slices: 50
+  max_num_cams: 5
+  num_dims: 3
   cam_ids: [0]
 
 view:
