@@ -137,7 +137,7 @@ class GSSystem3D(LightningModule):
     def compute_loss(self, results):
         loss = 0.
 
-        for recon_type in ['3d', '2d', 'mdp']:
+        for recon_type in results.keys():
             pred_data, gt_data = results[recon_type]
             if self.hparams['loss'][recon_type]['w_l1'] > 0:
                 loss_l1 = l1_loss(pred_data, gt_data)

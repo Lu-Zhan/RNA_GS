@@ -17,12 +17,15 @@ from systems.recon_systems import *
 
 
 class GSRegSystem(GSSystem3D):
+    def setup(self, stage):
+        self.gs_model.require_grad(False)
+    
     def configure_optimizers(self):
         cam_optimizer = optim.Adam(self.cam_model.parameters, lr=self.hparams['train']['lr_cam'])
         return cam_optimizer
 
     def training_step(self, batch, batch_idx):
-        gt_3d, cam_indexs, slice_indexs = batch
+        gt_3d, cam_indexs, slice_indexs, reg_masks = batch
 
         recon_3d, cov2d, radii, _ = self.gs_model.render_slice(
             camera=self.cam_model, cam_indexs=cam_indexs, slice_indexs=slice_indexs,
@@ -33,15 +36,14 @@ class GSRegSystem(GSSystem3D):
 
         recon_2d = recon_3d.max(dim=0)[0]  #.max(dim=0)[0]   # (n, h, w, k) -> (h, w, k)
         recon_mdp = recon_2d.max(dim=-1)[0]  #.max(dim=0)[0]   # (h, w, k) -> (h, w)
-        
+
         results = {
             '3d': (recon_3d, gt_3d),
             '2d': (recon_2d, gt_2d),
             'mdp': (recon_mdp, gt_mdp),
-            'cov2d': cov2d,
-            'radii': radii,
         }
 
+        # loss = self.compute_loss_with_mask(results, reg_masks)
         loss = self.compute_loss(results)
         
         self.log_step("train/total_loss", loss, prog_bar=True)
@@ -52,6 +54,49 @@ class GSRegSystem(GSSystem3D):
             self.log_step("params/lr_cam", self.trainer.optimizers[1].param_groups[0]['lr'])
 
         return loss
+
+    def compute_loss_with_mask(self, results, reg_masks):
+        loss = 0.
+
+        for recon_type in results.keys():
+            pred_data, gt_data = results[recon_type]
+            if self.hparams['loss'][recon_type]['w_l1'] > 0:
+                loss_l1 = ((pred_data - gt_data) * reg_masks).abs().sum() / (reg_masks.sum() + 1e-8)
+                loss += self.hparams['loss'][recon_type]['w_l1'] * loss_l1
+                self.log_step(f"train_{recon_type}/loss_l1", loss_l1)
+            
+            if self.hparams['loss'][recon_type]['w_masked_l1'] > 0:
+                mask = reg_masks * (gt_data > 0.01)
+                loss_masked_l1 = (pred_data * mask - gt_data * mask).abs().sum() / (mask.sum() + 1e-8)
+                loss += self.hparams['loss'][recon_type]['w_masked_l1'] * loss_masked_l1
+                self.log_step(f"train_{recon_type}/loss_masked_l1", loss_masked_l1)
+            
+            if self.hparams['loss'][recon_type]['w_bg_l1'] > 0:
+                mask = reg_masks * (gt_data < 0.01)
+                loss_bg_l1 = (pred_data * mask).abs().sum() / (mask.sum() + 1e-8)
+                loss += self.hparams['loss'][recon_type]['w_bg_l1'] * loss_bg_l1
+                self.log_step(f"train_{recon_type}/loss_bg_l1", loss_bg_l1)
+            
+            if self.hparams['loss'][recon_type]['w_l2'] > 0:
+                loss_l2 = ((pred_data - gt_data) ** 2 * reg_masks).sum() / (reg_masks.sum() + 1e-8)
+                loss += self.hparams['loss'][recon_type]['w_l2'] * loss_l2
+                self.log_step(f"train_{recon_type}/loss_l2", loss_l2)
+            
+            if self.hparams['loss'][recon_type]['w_masked_l2'] > 0:
+                mask = reg_masks * (gt_data > 0.01)
+                loss_masked_l2 = ((pred_data - gt_data) ** 2 * mask).sum() / (mask.sum() + 1e-8)
+                loss += self.hparams['loss'][recon_type]['w_masked_l2'] * loss_masked_l2
+                self.log_step(f"train_{recon_type}/loss_masked_l2", loss_masked_l2)
+            
+            if self.hparams['loss'][recon_type]['w_bg_l2'] > 0:
+                mask = reg_masks * (gt_data < 0.01)
+                loss_bg_l2 = ((pred_data - gt_data) ** 2 * mask).sum() / (mask.sum() + 1e-8)
+                loss += self.hparams['loss'][recon_type]['w_bg_l2'] * loss_bg_l2
+                self.log_step(f"train_{recon_type}/loss_bg_l2", loss_bg_l2)
+
+    def validation_step(self, batch, batch_idx):
+        batch, cam_indexs, slice_indexs, _ = batch
+        self.validation_step_outputs.append((self.obtain_output(cam_indexs, slice_indexs), batch))
 
     def forward_evaluation(self, recon_3d, gt_3d, xys, is_predict=False, log_each_plane=False):
         recon_3d = self._original(recon_3d)

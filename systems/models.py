@@ -18,6 +18,13 @@ class GaussModel(torch.nn.Module):
         self._init_mask(num_primarys, num_backups)
 
         self.B_SIZE = B_SIZE
+
+    def require_grad(self, requires_grad):
+        self.means_3d.requires_grad = requires_grad
+        self.scales.requires_grad = requires_grad
+        self.quats.requires_grad = requires_grad
+        self.rgbs.requires_grad = requires_grad
+        self.opacities.requires_grad = requires_grad
     
     def render_slice(self, camera, cam_indexs, slice_indexs):
         means_3d, scales, quats, rgbs, opacities = self.obtain_data()

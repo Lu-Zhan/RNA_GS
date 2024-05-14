@@ -12,7 +12,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
 from systems import GSRegSystem
-from datasets import RNADataset3D
+from datasets import RNADatasetReg
 
 torch.set_float32_matmul_precision('medium')
 
@@ -33,7 +33,7 @@ def main():
 
     # logging
     logger = WandbLogger(
-        name=config['exp_name'],
+        name=config['exp_name'].replace('1_recon', '2_reg'),
         offline=False,
         project='rna_cali_0320',
         save_dir=config['exp_dir'],
@@ -56,18 +56,14 @@ def main():
 
     # model & dataloader
     config['camera']['cam_ids'] = config['camera']['cam_ids'][1:]
-    train_dataset = RNADataset3D(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
+    train_dataset = RNADatasetReg(hparams=config, mode='train')
+    train_dataloader = DataLoader(train_dataset, batch_size=40, shuffle=True, num_workers=8)
 
-    val_dataset = RNADataset3D(hparams=config, mode='val')
+    val_dataset = RNADatasetReg(hparams=config, mode='val')
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range
-    # config['camera']['cam_ids'] = train_dataset.cam_ids
-    # config['camera']['cam_indexs'] = train_dataset.cam_indexs
-    # config['camera']['slice_indexs'] = train_dataset.slice_indexs
-    # config['camera']['num_slices'] = train_dataset.num_slices
 
     recon_ckpt_path = glob.glob(os.path.join(args.recon_dir, 'checkpoints', 'psnr=*.ckpt'))[0]
     gs_system = GSRegSystem.load_from_checkpoint(recon_ckpt_path)
