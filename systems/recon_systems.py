@@ -138,6 +138,9 @@ class GSSystem3D(LightningModule):
         loss = 0.
 
         for recon_type in results.keys():
+            if recon_type not in ['3d', '2d', 'mdp']:
+                continue
+
             pred_data, gt_data = results[recon_type]
             if self.hparams['loss'][recon_type]['w_l1'] > 0:
                 loss_l1 = l1_loss(pred_data, gt_data)

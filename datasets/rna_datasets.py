@@ -34,6 +34,8 @@ class RNADataset3D(Dataset):
         # select gt_images, cam_ids, slice_indexs, dapi_images by cam_ids
         self.select_camera(cam_ids=hparams['camera']['cam_ids'])
         self.count = 0
+
+        self.data_len = self.gt_images.shape[0]
         
     def __len__(self):
         if self.mode == 'train':
@@ -42,16 +44,19 @@ class RNADataset3D(Dataset):
             return self.gt_images.shape[0]
         
     def __getitem__(self, index):
-        if self.count == 0:
-            self.cam_id = self.cam_ids[index % self.gt_images.shape[0]]
+        # if self.count == 0:
+        #     self.cam_id = self.cam_ids[index % self.gt_images.shape[0]]
 
-        self.count = (self.count + 1) % self.batch_size
+        # self.count = (self.count + 1) % self.batch_size
         
-        select_cam_index = self.cam_ids == self.cam_id
-        select_sample_index = index % select_cam_index.sum()
-        return self.gt_images[select_cam_index][select_sample_index], \
-            self.cam_ids[select_cam_index][select_sample_index], \
-            self.slice_indexs[select_cam_index][select_sample_index]    # (h, w, c)
+        # select_cam_index = self.cam_ids == self.cam_id
+        # select_sample_index = index % select_cam_index.sum()
+        # return self.gt_images[select_cam_index][select_sample_index], \
+        #     self.cam_ids[select_cam_index][select_sample_index], \
+        #     self.slice_indexs[select_cam_index][select_sample_index]    # (h, w, c)
+
+        index = index % self.data_len
+        return self.gt_images[index], self.cam_ids[index], self.slice_indexs[index]
 
     @property
     def size(self):

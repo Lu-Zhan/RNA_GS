@@ -55,10 +55,10 @@ def main():
     config['camera']['cam_ids'] = config['camera']['cam_ids'][:1]
     # model & dataloader
     train_dataset = RNADataset3D(hparams=config, mode='train')
-    train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=8)
+    train_dataloader = DataLoader(train_dataset, batch_size=config['train']['batch_size'], shuffle=True, num_workers=4, prefetch_factor=4)
 
     val_dataset = RNADataset3D(hparams=config, mode='val')
-    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4, prefetch_factor=4)
 
     config['hw'] = train_dataset.size[:2]
     config['value_range'] = train_dataset.range

@@ -31,6 +31,9 @@ class GSRegSystem(GSSystem3D):
             camera=self.cam_model, cam_indexs=cam_indexs, slice_indexs=slice_indexs,
         )
 
+        # maskout unregistered regions
+        gt_3d[reg_masks == 0] = recon_3d[reg_masks == 0]
+
         gt_2d = gt_3d.max(dim=0)[0]    # (k, h, w, c) -> (h, w, c)
         gt_mdp = gt_2d.max(dim=-1)[0]  # (h, w, c) -> (h, w)
 
@@ -54,45 +57,6 @@ class GSRegSystem(GSSystem3D):
             self.log_step("params/lr_cam", self.trainer.optimizers[1].param_groups[0]['lr'])
 
         return loss
-
-    def compute_loss_with_mask(self, results, reg_masks):
-        loss = 0.
-
-        for recon_type in results.keys():
-            pred_data, gt_data = results[recon_type]
-            if self.hparams['loss'][recon_type]['w_l1'] > 0:
-                loss_l1 = ((pred_data - gt_data) * reg_masks).abs().sum() / (reg_masks.sum() + 1e-8)
-                loss += self.hparams['loss'][recon_type]['w_l1'] * loss_l1
-                self.log_step(f"train_{recon_type}/loss_l1", loss_l1)
-            
-            if self.hparams['loss'][recon_type]['w_masked_l1'] > 0:
-                mask = reg_masks * (gt_data > 0.01)
-                loss_masked_l1 = (pred_data * mask - gt_data * mask).abs().sum() / (mask.sum() + 1e-8)
-                loss += self.hparams['loss'][recon_type]['w_masked_l1'] * loss_masked_l1
-                self.log_step(f"train_{recon_type}/loss_masked_l1", loss_masked_l1)
-            
-            if self.hparams['loss'][recon_type]['w_bg_l1'] > 0:
-                mask = reg_masks * (gt_data < 0.01)
-                loss_bg_l1 = (pred_data * mask).abs().sum() / (mask.sum() + 1e-8)
-                loss += self.hparams['loss'][recon_type]['w_bg_l1'] * loss_bg_l1
-                self.log_step(f"train_{recon_type}/loss_bg_l1", loss_bg_l1)
-            
-            if self.hparams['loss'][recon_type]['w_l2'] > 0:
-                loss_l2 = ((pred_data - gt_data) ** 2 * reg_masks).sum() / (reg_masks.sum() + 1e-8)
-                loss += self.hparams['loss'][recon_type]['w_l2'] * loss_l2
-                self.log_step(f"train_{recon_type}/loss_l2", loss_l2)
-            
-            if self.hparams['loss'][recon_type]['w_masked_l2'] > 0:
-                mask = reg_masks * (gt_data > 0.01)
-                loss_masked_l2 = ((pred_data - gt_data) ** 2 * mask).sum() / (mask.sum() + 1e-8)
-                loss += self.hparams['loss'][recon_type]['w_masked_l2'] * loss_masked_l2
-                self.log_step(f"train_{recon_type}/loss_masked_l2", loss_masked_l2)
-            
-            if self.hparams['loss'][recon_type]['w_bg_l2'] > 0:
-                mask = reg_masks * (gt_data < 0.01)
-                loss_bg_l2 = ((pred_data - gt_data) ** 2 * mask).sum() / (mask.sum() + 1e-8)
-                loss += self.hparams['loss'][recon_type]['w_bg_l2'] * loss_bg_l2
-                self.log_step(f"train_{recon_type}/loss_bg_l2", loss_bg_l2)
 
     def validation_step(self, batch, batch_idx):
         batch, cam_indexs, slice_indexs, _ = batch
